@@ -277,11 +277,63 @@ input[type=file]{display:none;}
 .star-btn:hover { color: var(--amber); border-color: var(--amber); background: rgba(245,158,11,0.05); }
 .star-btn.saved { color: var(--amber); border-color: var(--amber); background: rgba(245,158,11,0.1); pointer-events: none; }
 
+
+/* 4단계: 바인더 노트 열람 팝업 스타일 */
+.note-modal {
+  position: fixed; inset: 0; z-index: 999; background: rgba(0,0,0,0.85);
+  display: none; align-items: center; justify-content: center; backdrop-filter: blur(5px);
+}
+.note-modal.open { display: flex; }
+.note-card {
+  width: 90%; max-width: 600px; max-height: 85vh; background: var(--bg2);
+  border: 1px solid var(--border); border-radius: 20px; display: flex; flex-direction: column;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+}
+.note-hdr {
+  padding: 18px 20px; border-bottom: 1px solid var(--border); display: flex;
+  justify-content: space-between; align-items: center; background: var(--bg3);
+  border-radius: 20px 20px 0 0;
+}
+.note-hdr h3 { font-size: 16px; color: var(--accent2); margin: 0; }
+.note-close { background: none; border: none; color: var(--text2); font-size: 24px; cursor: pointer; }
+.note-body {
+  padding: 20px; overflow-y: auto; flex: 1; color: var(--text); font-size: 14.5px; line-height: 1.7;
+}
+/* 저장된 개별 노트 아이템 */
+.saved-item {
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 12px;
+  padding: 16px; margin-bottom: 16px; position: relative;
+}
+.saved-item:last-child { margin-bottom: 0; }
+.delete-note-btn {
+  position: absolute; top: 12px; right: 12px; background: rgba(248,113,113,0.1);
+  border: 1px solid rgba(248,113,113,0.3); color: var(--red); border-radius: 6px;
+  padding: 4px 8px; font-size: 11px; cursor: pointer; transition: all 0.2s;
+}
+.delete-note-btn:hover { background: rgba(248,113,113,0.2); }
+
+
+
+
   
 </style>
 </head>
 <body>
 
+  <!-- ══  4단계 : 노트 저장 기능 ══ -->
+<div class="note-modal" id="noteModal">
+  <div class="note-card">
+    <div class="note-hdr">
+      <h3 id="noteModalTitle">단원 노트</h3>
+      <button class="note-close" onclick="closeNoteModal()">✕</button>
+    </div>
+    <div class="note-body" id="noteModalBody">
+      </div>
+  </div>
+</div>
+
+
+  
 <!-- ══ SCREEN 1: ONBOARDING ══ -->
 <div class="screen" id="screen-onboard">
   <div class="ob-card">
@@ -462,6 +514,8 @@ input[type=file]{display:none;}
 <input type="file" id="fGallery" accept="image/*" multiple>
 <input type="file" id="fAny" accept="image/*,application/pdf">
 
+
+  
 <script>
 
 // ══════════ TEXTBOOK (정식 출시 때는 빈 객체 {} 로 시작합니다) ══════════
@@ -563,7 +617,7 @@ function buildSubjList(){
         // 3단: 소단원 아이템 및 ★ 표시
         const count = starCounts[id] || 0;
         bookHtml += `
-          <div class="subj-item" onclick="setSubj('${id}')" style="justify-content: space-between; padding: 8px 10px;">
+          <div class="subj-item" onclick="openNote('${id}')" style="justify-content: space-between; padding: 8px 10px;">
             <span style="flex:1;"><span class="subj-num" style="display:inline-block; width:45px;">${id}</span> ${name}</span>
             <span class="star-count" style="color:var(--amber); font-weight:bold; font-size:12px;">★:${count}</span>
           </div>`;
@@ -969,19 +1023,19 @@ ${aiText}
     btnElement.dataset.saved = "";
   }
 }
-
-
-
+  
 // ══════════ MISC ══════════
+// 채팅 초기화 & 저장된 바인더(별점) 완전히 초기화
 function clearChat(){
-  if(!confirm('대화를 초기화할까요?'))return;
+  if(!confirm('채팅 기록과 바인더에 저장된 모든 노트를 초기화하시겠습니까? (복구 불가)')) return;
   messages=[];
-  document.getElementById('chatMessages').innerHTML=`<div class="chat-empty" id="chatEmpty"><div class="empty-icon">✦</div><div class="empty-title">무엇이든 물어보세요</div><div class="empty-sub">연습문제 사진을 올리거나<br>헷갈리는 개념을 질문해봐요</div><div class="chips"><div class="chip" onclick="suggest('PN접합 순방향 바이어스 전류식 유도해줘')">PN접합 전류식</div><div class="chip" onclick="suggest('페르미 준위 에너지 대역도로 설명해줘')">페르미 준위</div><div class="chip" onclick="suggest('MOSFET 문턱전압 식 정리해줘')">MOSFET 문턱전압</div><div class="chip" onclick="suggest('이 문제 단계별로 풀어줘')">문제 풀이</div></div></div>`;
+  localStorage.removeItem('starCounts'); // 별점 초기화
+  localStorage.removeItem('savedNotes'); // 저장된 노트 초기화
+  document.getElementById('chatMessages').innerHTML=`<div class="chat-empty" id="chatEmpty"><div class="empty-icon">✦</div><div class="empty-title">무엇이든 물어보세요</div><div class="empty-sub">연습문제 사진을 올리거나<br>헷갈리는 개념을 질문해봐요</div><div class="chips"><div class="chip" onclick="suggest('PN접합 순방향 바이어스 전류식 유도해줘')">PN접합 전류식</div><div class="chip" onclick="suggest('페르미 준위 에너지 대역도로 설명해줘')">페르미 준위</div><div class=\"chip\" onclick=\"suggest('MOSFET 문턱전압 식 정리해줘')\">MOSFET 문턱전압</div><div class=\"chip\" onclick=\"suggest('이 문제 단계별로 풀어줘')\">문제 풀이</div></div></div>`;
+  buildSubjList(); // 사이드바 숫자 0으로 즉시 반영
 }
-function openLb(s){document.getElementById('lbImg').src=s;document.getElementById('lightbox').classList.add('open');}
-function closeLb(){document.getElementById('lightbox').classList.remove('open');}
-document.getElementById('lightbox').onclick=e=>{if(e.target===document.getElementById('lightbox'))closeLb();};
 
+  
 // ══════════ INIT ══════════
 (()=>{
   const k=localStorage.getItem('ab_key'),p=localStorage.getItem('ab_prov')||'gemini';
@@ -993,6 +1047,62 @@ document.getElementById('lightbox').onclick=e=>{if(e.target===document.getElemen
     showScreen('screen-chat'); buildSubjList();
   } else { showScreen('screen-onboard'); }
 })();
+
+
+  // ══════════ BINDER NOTE VIEWER (4단계) ══════════
+
+// 사이드바에서 소단원을 클릭했을 때 노트를 엽니다.
+function openNote(targetId) {
+  const name = getSubjectName(targetId);
+  document.getElementById('noteModalTitle').textContent = `[${targetId}] ${name}`;
+  
+  const savedNotes = JSON.parse(localStorage.getItem('savedNotes')) || {};
+  const notesArray = savedNotes[targetId] || [];
+  
+  const body = document.getElementById('noteModalBody');
+  
+  if (notesArray.length === 0) {
+    body.innerHTML = `<div style="text-align:center; color:var(--text3); padding: 40px 0;">아직 저장된 노트가 없습니다.<br>채팅창에서 마음에 드는 답변에 ★을 눌러보세요!</div>`;
+  } else {
+    let html = '';
+    // 저장된 노트들을 하나씩 그립니다.
+    notesArray.forEach((note, index) => {
+      // 렌더링 함수(render)를 거쳐서 예쁜 마크다운/수식으로 보여줍니다.
+      html += `
+        <div class="saved-item">
+          <button class="delete-note-btn" onclick="deleteNote('${targetId}', ${index})">지우기 ✕</button>
+          ${render(note)}
+        </div>`;
+    });
+    body.innerHTML = html;
+  }
+  
+  document.getElementById('noteModal').classList.add('open');
+}
+
+function closeNoteModal() {
+  document.getElementById('noteModal').classList.remove('open');
+}
+
+// 특정 노트를 지우는(별 취소) 함수
+function deleteNote(targetId, index) {
+  if(!confirm('이 노트를 바인더에서 삭제하시겠습니까?')) return;
+  
+  let savedNotes = JSON.parse(localStorage.getItem('savedNotes')) || {};
+  let starCounts = JSON.parse(localStorage.getItem('starCounts')) || {};
+  
+  if(savedNotes[targetId]) {
+    savedNotes[targetId].splice(index, 1); // 배열에서 해당 노트 삭제
+    localStorage.setItem('savedNotes', JSON.stringify(savedNotes));
+    
+    // 별 개수도 1개 차감 (0 이하로 안 떨어지게)
+    starCounts[targetId] = Math.max(0, (starCounts[targetId] || 0) - 1);
+    localStorage.setItem('starCounts', JSON.stringify(starCounts));
+    
+    buildSubjList(); // 사이드바 숫자 갱신
+    openNote(targetId); // 모달 화면 갱신
+  }
+}
 
   
 </script>

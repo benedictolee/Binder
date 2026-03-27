@@ -541,9 +541,9 @@ function startChat(){
 
 // ══════════ SUBJECT ══════════
 // 각 단원별 저장된 ★ 개수를 가져옵니다. (없으면 0)
-let starCounts = JSON.parse(localStorage.getItem('starCounts')) || {};
 
 function buildSubjList(){
+  let starCounts = JSON.parse(localStorage.getItem('starCounts')) || {};
   const l = document.getElementById('subjList');
   l.innerHTML = '';
 

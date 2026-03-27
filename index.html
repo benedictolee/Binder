@@ -591,8 +591,7 @@ function sysPrompt(){
   const s=subj?`현재 학습 단원: §${subj} ${TB[subj]}\n`:'';
   return `당신은 학습전용AI입니다. 답변은 간결하고 사무적인 말투 위주로 해주세요. \n${s}규칙: 수식은 LaTeX($...$), 단계별 풀이, 한국어 답변.`;
 }
-
-     // ══════════ GEMINI (비동기 일괄 수신) ══════════
+// ══════════ GEMINI (비동기 일괄 수신 & 검열 필터 해제!) ══════════
 async function streamGemini(bbl) {
   const contents = messages.map(m => {
     if (typeof m.content === 'string') return { role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] };
@@ -604,12 +603,22 @@ async function streamGemini(bbl) {
       }
       return { text: '' };
     });
-    return { role: 'user', parts };
+    return { role: m.role === 'assistant' ? 'model' : 'user', parts };
   });
 
-  const body = { system_instruction: { parts: [{ text: sysPrompt() }] }, contents, generationConfig: { temperature: 0.7, maxOutputTokens: 2048 } };
+  const body = { 
+    system_instruction: { parts: [{ text: sysPrompt() }] }, 
+    contents, 
+    generationConfig: { temperature: 0.7, maxOutputTokens: 4096 }, // 혹시 몰라 길이도 2배로 늘렸습니다!
+    // 👇 바로 이 부분이 핵심입니다! 모든 검열 필터를 끕니다.
+    safetySettings: [
+      { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+      { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+      { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+      { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+    ]
+  };
   
-  // URL에서 streamGenerateContent를 그냥 generateContent로 바꿨습니다!
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
   const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -621,6 +630,8 @@ async function streamGemini(bbl) {
   scroll();
   return fullText;
 }
+
+
 
 // ══════════ CLAUDE (비동기 일괄 수신) ══════════
 async function streamClaude(bbl) {

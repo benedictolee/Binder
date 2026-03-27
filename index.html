@@ -266,6 +266,18 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 
 *{scrollbar-width:thin;scrollbar-color:var(--border) transparent;}
 input[type=file]{display:none;}
+
+
+  /* 2단계: AI 말풍선 하단 ★ 보관 버튼 스타일 */
+.star-btn {
+  background: transparent; border: 1px solid var(--border2); border-radius: 8px;
+  color: var(--text3); font-size: 14px; padding: 4px 14px; cursor: pointer;
+  transition: all 0.2s; font-weight: bold;
+}
+.star-btn:hover { color: var(--amber); border-color: var(--amber); background: rgba(245,158,11,0.05); }
+.star-btn.saved { color: var(--amber); border-color: var(--amber); background: rgba(245,158,11,0.1); pointer-events: none; }
+
+  
 </style>
 </head>
 <body>
@@ -502,8 +514,6 @@ const library = {
   }
 };
 
-  
-const TRIGGERS = /이해했|알겠|다음\s*(문제|단원)|넘어가|고마워|감사|됐어|ok|오케이|ㅇㅋ/i;
 
 // ══════════ STATE ══════════
 let provider='gemini', apiKey='', messages=[], imgs=[], streaming=false, ctrl=null, subj=null;
@@ -705,21 +715,19 @@ function suggest(t){ document.getElementById('chatInput').value=t; document.getE
 
 async function send(){
   if(streaming){ cancelStream(); return; }
-  const inp=document.getElementById('chatInput');
-  const text=inp.value.trim(); if(!text&&!imgs.length)return;
-  inp.value=''; inp.style.height='';
-  const imgsCopy=[...imgs]; imgs=[]; renderImgPreviews();
+  const inp = document.getElementById('chatInput');
+  const text = inp.value.trim(); if(!text && !imgs.length) return;
+  inp.value = ''; inp.style.height = '';
+  const imgsCopy = [...imgs]; imgs = []; renderImgPreviews();
 
-  addUserBubble(text,imgsCopy);
-  const userMsg=imgsCopy.length
-    ? {role:'user',content:[...imgsCopy.map(s=>({type:'image_url',image_url:{url:s}})),text?{type:'text',text}:null].filter(Boolean)}
-    : {role:'user',content:text};
+  addUserBubble(text, imgsCopy);
+  const userMsg = imgsCopy.length
+    ? {role:'user', content:[...imgsCopy.map(s=>({type:'image_url', image_url:{url:s}})), text ? {type:'text',text} : null].filter(Boolean)}
+    : {role:'user', content:text};
   messages.push(userMsg);
 
-  if(text&&TRIGGERS.test(text)){ setTimeout(showTrigger,500); setTimeout(bgSummarize,1000); }
-
-  const bbl=addAIBubble();
-  streaming=true; setSend('stop');
+  const bbl = addAIBubble();
+  streaming = true; setSend('stop');
 
   try{
     let ai = '';
@@ -727,12 +735,38 @@ async function send(){
     else if (provider === 'claude') ai = await streamClaude(bbl);
     else if (provider === 'gpt') ai = await streamGPT(bbl);
     
-    messages.push({role:'assistant',content:ai});
-  }catch(e){
-    if(e.name!=='AbortError') bbl.innerHTML=`<span style="color:var(--red)">오류: ${e.message}</span>`;
+    messages.push({role:'assistant', content:ai});
+
+    // ⭐ [2단계] 스트리밍이 완전히 완료된 후 말풍선 안에 [★] 버튼 생성
+    const btnWrap = document.createElement('div');
+    btnWrap.style.cssText = 'margin-top: 14px; padding-top: 10px; border-top: 1px dashed var(--border2); text-align: right;';
+    
+    const starBtn = document.createElement('button');
+    starBtn.className = 'star-btn';
+    starBtn.innerHTML = '★'; // 심플한 별 아이콘!
+    starBtn.title = '이 답변을 내 바인더에 자동 분류하기';
+    
+    // 버튼 클릭 시 3단계 자동 분류 함수 실행
+    starBtn.onclick = function() {
+      if(this.dataset.saved) return; // 중복 클릭 방지
+      this.dataset.saved = "true";
+      this.classList.add('saved');
+      this.innerHTML = '★ 분류 중...';
+      
+      // 🚀 방금 전 유저의 질문(text)과 AI의 답변(ai)을 통째로 넘김!
+      autoSaveToBinder(text, ai, this); 
+    };
+    
+    btnWrap.appendChild(starBtn);
+    bbl.appendChild(btnWrap);
+    scroll();
+
+  } catch(e) {
+    if(e.name !== 'AbortError') bbl.innerHTML = `<span style="color:var(--red)">오류: ${e.message}</span>`;
   }
-  streaming=false; setSend('send');
+  streaming = false; setSend('send');
 }
+
 
 function cancelStream(){ ctrl?.abort(); streaming=false; setSend('send'); }
 function setSend(m){
@@ -846,13 +880,16 @@ async function streamGPT(bbl) {
 
 
 
-// ══════════ BACKGROUND SUMMARIZE ══════════
-async function bgSummarize(){
-  if(messages.length<2)return;
-  const textMsgs=messages.map(m=>({role:m.role,content:typeof m.content==='string'?m.content:m.content.filter(p=>p.type==='text').map(p=>p.text).join(' ')})).filter(m=>m.content.trim());
-  try{ await fetch('/api/summarize',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages:textMsgs,subject:subj})}); }
-  catch{} // silent
+// ══════════ BACKGROUND AUTO SAVE (3단계 로직 준비) ══════════
+async function autoSaveToBinder(userText, aiText, btnElement) {
+  // 💡 3단계에서 여기에 Gemini가 질문 문맥을 파악해서 단원 폴더를 찾고 요약하는 코드가 들어갑니다!
+  
+  // [2단계 테스트용] 버튼 누르고 1.5초 뒤에 시각적으로 완료 처리만 해줍니다.
+  setTimeout(() => {
+    btnElement.innerHTML = '★ 킵 완료!';
+  }, 1500);
 }
+
 
 // ══════════ MISC ══════════
 function clearChat(){

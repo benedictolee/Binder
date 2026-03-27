@@ -39,7 +39,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
   margin-bottom:6px;display:flex;align-items:baseline;gap:4px;}
 .ob-logo em{color:var(--accent2);font-style:italic;}
 .ob-sub{font-size:13.5px;color:var(--text2);line-height:1.6;margin-bottom:28px;}
-.ob-provider{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px;}
+.ob-provider{display:grid;grid-template-columns:repeat(3, 1fr);gap:8px;margin-bottom:20px;}
 .provider-btn{border:1px solid var(--border);border-radius:12px;padding:12px 14px;
   background:var(--bg3);cursor:pointer;transition:all .2s;text-align:left;color:var(--text2);}
 .provider-btn:hover{border-color:var(--accent);color:var(--text);}
@@ -242,7 +242,7 @@ input[type=file]{display:none;}
     <p class="ob-sub">AI 튜터와 대화하며 공부하면,<br>나만의 비법 노트가 자동 완성돼요.</p>
 
     <div class="ob-label">AI 제공자 선택</div>
-    <div class="ob-provider" id="providerBtns">
+        <div class="ob-provider" id="providerBtns">
       <button class="provider-btn selected" data-provider="gemini" onclick="selectProvider('gemini',this)">
         <span class="pb-icon">✦</span>
         <span class="pb-name">Google Gemini</span>
@@ -251,7 +251,12 @@ input[type=file]{display:none;}
         <span class="pb-icon">◈</span>
         <span class="pb-name">Claude (Anthropic)</span>
       </button>
+      <button class="provider-btn" data-provider="gpt" onclick="selectProvider('gpt',this)">
+        <span class="pb-icon">●</span>
+        <span class="pb-name">OpenAI GPT</span>
+      </button>
     </div>
+
 
     <div class="ob-label" id="keyLabel">Gemini API Key</div>
     <div class="ob-input-wrap">
@@ -426,22 +431,23 @@ const TRIGGERS = /이해했|알겠|다음\s*(문제|단원)|넘어가|고마워|
 let provider='gemini', apiKey='', messages=[], imgs=[], streaming=false, ctrl=null, subj=null;
 
 // ══════════ ONBOARDING ══════════
-function selectProvider(p, btn){
+
+
+  function selectProvider(p, btn){
   provider=p;
   document.querySelectorAll('.provider-btn').forEach(b=>b.classList.remove('selected'));
   btn.classList.add('selected');
-  document.getElementById('keyLabel').textContent = p==='gemini'?'Gemini API Key':'Claude API Key';
-  document.getElementById('keyBadgeTxt').textContent = p==='gemini'?'Gemini':'Claude';
+  document.getElementById('keyLabel').textContent = p==='gemini' ? 'Gemini API Key' : (p==='claude' ? 'Claude API Key' : 'OpenAI API Key');
+  document.getElementById('keyBadgeTxt').textContent = p==='gemini' ? 'Gemini' : (p==='claude' ? 'Claude' : 'GPT');
 }
 function checkKey(){ document.getElementById('obStart').disabled = document.getElementById('apiKeyInput').value.trim().length<10; }
 function toggleEye(){ const i=document.getElementById('apiKeyInput'); i.type=i.type==='password'?'text':'password'; }
 function startChat(){
   const v=document.getElementById('apiKeyInput').value.trim(); if(!v)return;
   apiKey=v; localStorage.setItem('ab_key',v); localStorage.setItem('ab_prov',provider);
-  document.getElementById('keyBadgeTxt').textContent=provider==='gemini'?'Gemini':'Claude';
+  document.getElementById('keyBadgeTxt').textContent = provider==='gemini' ? 'Gemini' : (provider==='claude' ? 'Claude' : 'GPT');
   showScreen('screen-chat'); buildSubjList();
 }
-function showScreen(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
 
 // ══════════ SUBJECT ══════════
 function buildSubjList(){
@@ -560,7 +566,11 @@ async function send(){
   streaming=true; setSend('stop');
 
   try{
-    const ai = provider==='gemini' ? await streamGemini(bbl) : await streamClaude(bbl);
+    let ai = '';
+    if (provider === 'gemini') ai = await streamGemini(bbl);
+    else if (provider === 'claude') ai = await streamClaude(bbl);
+    else if (provider === 'gpt') ai = await streamGPT(bbl);
+    
     messages.push({role:'assistant',content:ai});
   }catch(e){
     if(e.name!=='AbortError') bbl.innerHTML=`<span style="color:var(--red)">오류: ${e.message}</span>`;
@@ -706,6 +716,57 @@ async function streamClaude(bbl){
 }
 
 
+ // ══════════ GPT STREAMING ══════════
+async function streamGPT(bbl){
+  ctrl=new AbortController();
+  const openaiMsgs = [{role: 'system', content: sysPrompt()}];
+  
+  messages.forEach(m => {
+    if(typeof m.content === 'string') {
+      openaiMsgs.push(m);
+    } else {
+      const content = m.content.map(p => {
+        if(p.type === 'text') return {type: 'text', text: p.text};
+        if(p.type === 'image_url') return {type: 'image_url', image_url: {url: p.image_url.url}};
+      });
+      openaiMsgs.push({role: m.role, content});
+    }
+  });
+
+  const res=await fetch('https://api.openai.com/v1/chat/completions',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':`Bearer ${apiKey}`},
+    body:JSON.stringify({model:'gpt-4o-mini',messages:openaiMsgs,stream:true}),
+    signal:ctrl.signal
+  });
+  
+  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`HTTP ${res.status}`);}
+  
+  const reader=res.body.getReader(),dec=new TextDecoder();
+  let full='', buffer=''; bbl.innerHTML='';
+  
+  while(true){
+    const{done,value}=await reader.read(); if(done)break;
+    
+    buffer += dec.decode(value, {stream: true});
+    const lines = buffer.split('\n');
+    buffer = lines.pop(); 
+    
+    for(const line of lines){
+      if(!line.startsWith('data: '))continue;
+      const js=line.slice(6).trim();
+      if(js==='[DONE]')continue;
+      try{
+        const d=JSON.parse(js);
+        const t=d.choices?.[0]?.delta?.content||'';
+        if(t){full+=t;bbl.innerHTML=render(full);scroll();}
+      }catch(e){} 
+    }
+  }
+  return full;
+}
+
+
 // ══════════ BACKGROUND SUMMARIZE ══════════
 async function bgSummarize(){
   if(messages.length<2)return;
@@ -730,11 +791,13 @@ document.getElementById('lightbox').onclick=e=>{if(e.target===document.getElemen
   if(k){
     apiKey=k; provider=p;
     document.getElementById('apiKeyInput').value=k;
-    document.getElementById('keyBadgeTxt').textContent=p==='gemini'?'Gemini':'Claude';
+    document.getElementById('keyBadgeTxt').textContent=p==='gemini'?'Gemini':(p==='claude'?'Claude':'GPT');
     document.querySelectorAll('.provider-btn').forEach(b=>b.classList.toggle('selected',b.dataset.provider===p));
     showScreen('screen-chat'); buildSubjList();
   } else { showScreen('screen-onboard'); }
 })();
+
+  
 </script>
 </body>
 </html>

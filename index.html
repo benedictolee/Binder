@@ -136,6 +136,14 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
   border-radius:10px;padding:12px 14px;margin:8px 0;overflow-x:auto;}
 .msg-bubble pre code{background:none;padding:0;color:var(--text2);}
 .msg-bubble strong{font-weight:600;}
+.msg-bubble h1, .msg-bubble h2, .msg-bubble h3 { margin: 12px 0 6px; font-weight: 600; color: var(--accent2); }
+.msg-bubble h1 { font-size: 1.15em; }
+.msg-bubble h2 { font-size: 1.1em; }
+.msg-bubble h3 { font-size: 1.05em; }
+.msg-bubble hr { border: 0; border-top: 1px dashed var(--border); margin: 14px 0; }
+.msg-bubble ul, .msg-bubble ol { margin: 8px 0 8px 20px; }
+.msg-bubble li { margin-bottom: 4px; }
+
 .thinking-dots span{display:inline-block;width:6px;height:6px;border-radius:50%;
   background:var(--accent);animation:dotb .8s infinite ease-in-out;margin:0 2px;}
 .thinking-dots span:nth-child(2){animation-delay:.15s;}
@@ -477,20 +485,26 @@ function rmImg(i){ imgs.splice(i,1); renderImgPreviews(); }
 function esc(t){ return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function render(text){
   let h=esc(text);
-  // Block math $$...$$
+  // 수식 (LaTeX)
   h=h.replace(/\$\$([^$]+)\$\$/g,(_,e)=>{ try{const s=document.createElement('span');katex.render(e.trim(),s,{throwOnError:false,displayMode:true});return s.outerHTML;}catch{return`<code>$$${e}$$</code>`;}});
-  // Inline math $...$
   h=h.replace(/\$([^$\n]+)\$/g,(_,e)=>{ try{const s=document.createElement('span');katex.render(e.trim(),s,{throwOnError:false,displayMode:false});return s.outerHTML;}catch{return`<code>$${e}$</code>`;}});
-  // Code blocks
+  // 코드 블록 & 인라인 코드
   h=h.replace(/```[\w]*\n?([\s\S]*?)```/g,(_,c)=>`<pre><code>${c.trim()}</code></pre>`);
-  // Inline code
   h=h.replace(/`([^`]+)`/g,'<code>$1</code>');
-  // Bold
+  // 마크다운 서식 (제목, 굵게, 구분선)
+  h=h.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+  h=h.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+  h=h.replace(/^# (.*$)/gim, '<h1>$1</h1>');
   h=h.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
-  // Newlines
+  h=h.replace(/^-{3,}/gim, '<hr>');
+  // 리스트 (*)
+  h=h.replace(/^\* (.*$)/gim, '<ul><li>$1</li></ul>');
+  h=h.replace(/<\/ul>\n<ul>/g, ''); // 연속된 리스트 합치기
+  // 줄바꿈
   h=h.replace(/\n/g,'<br>');
   return h;
 }
+
 
 function scroll(){ const el=document.getElementById('chatMessages'); el.scrollTop=el.scrollHeight; }
 
@@ -587,13 +601,39 @@ async function streamGemini(bbl){
   const reader=res.body.getReader(),dec=new TextDecoder();
   let full=''; bbl.innerHTML='';
   while(true){
-    const{done,value}=await reader.read(); if(done)break;
-    const lines=dec.decode(value).split('\n');
+    // 기존 streamGemini 함수 내부의 while 루프 전체를 아래 코드로 교체하세요!
+  const reader=res.body.getReader(),dec=new TextDecoder();
+  let full='', buffer=''; bbl.innerHTML='';
+  
+  while(true){
+    const{done,value}=await reader.read(); 
+    if(done) break;
+    
+    // 조각난 데이터를 버퍼에 모아서 온전한 줄바꿈(\n) 단위로만 처리
+    buffer += dec.decode(value, {stream: true});
+    const lines = buffer.split('\n');
+    buffer = lines.pop(); // 마지막 줄은 덜 완성됐을 수 있으니 다음 턴으로 넘김
+    
     for(const line of lines){
       if(!line.startsWith('data: '))continue;
-      const js=line.slice(6).trim(); if(js==='[DONE]')continue;
-      try{const d=JSON.parse(js),t=d.candidates?.[0]?.content?.parts?.[0]?.text||'';if(t){full+=t;bbl.innerHTML=render(full);scroll();}}catch{}
+      const js=line.slice(6).trim(); 
+      if(js==='[DONE]')continue;
+      try{
+        const d=JSON.parse(js);
+        const t=d.candidates?.[0]?.content?.parts?.[0]?.text||'';
+        if(t){
+            full+=t; 
+            bbl.innerHTML=render(full); 
+            scroll();
+        }
+      }catch(e){
+        // 에러가 나도 멈추지 않고 계속 진행
+        console.warn("JSON Parse Error skipped", e);
+      }
     }
+  }
+  return full;
+
   }
   return full;
 }

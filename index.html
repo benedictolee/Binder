@@ -224,6 +224,26 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
   color:var(--text2);cursor:pointer;transition:all .15s;background:var(--bg3);}
 .chip:hover{border-color:var(--accent);color:var(--text);}
 
+/* 사이드바 반응형 (PC/패드에서 90% 덮기) */
+@media (min-width: 768px) {
+  .subj-panel { width: 90vw !important; max-width: none; border-left: 1px solid var(--border); }
+}
+
+/* 폴더 아코디언 스타일 */
+.hidden { display: none !important; }
+.binder-category { margin-bottom: 8px; }
+.category-title { 
+  font-weight: 600; color: var(--text); padding: 12px 14px; 
+  background: var(--bg3); border-radius: 10px; cursor: pointer;
+  display: flex; justify-content: space-between; align-items: center;
+  border: 1px solid var(--border); transition: all 0.2s;
+}
+.category-title:hover { border-color: var(--accent); }
+.category-title::after { content: '▾'; color: var(--text2); }
+.category-title.collapsed::after { content: '▸'; }
+.chapter-list { margin-left: 10px; padding-bottom: 10px; border-left: 1px solid var(--border2); padding-left: 10px; margin-top: 6px; }
+
+  
 /* LIGHTBOX */
 #lightbox{position:fixed;inset:0;z-index:999;background:rgba(0,0,0,.93);
   display:none;align-items:center;justify-content:center;}
@@ -352,7 +372,7 @@ input[type=file]{display:none;}
 <div class="screen" id="screen-chat">
   <div class="chat-hdr">
     <div class="chat-hdr-logo">A<em>+</em> Binder</div>
-    <button class="subject-pill" id="subjPill" onclick="openSubjPanel()">전체 단원</button>
+    <button class="subject-pill" id="subjPill" onclick="openSubjPanel()">📚 binder</button>
     <div class="key-badge" onclick="showScreen('screen-onboard')" title="API Key 변경">
       <div class="dot"></div>
       <span id="keyBadgeTxt">Gemini</span>
@@ -419,16 +439,58 @@ input[type=file]{display:none;}
 <input type="file" id="fAny" accept="image/*,application/pdf">
 
 <script>
-// ══════════ TEXTBOOK ══════════
-const TB = {
-  '1.1':'결정구조','1.2':'전류 반송자','2.1':'전자의 파동성','2.2':'에너지 대역',
-  '2.3':'입자성','2.4':'페르미 분포','3.1':'표동전류','3.2':'옴의 법칙','3.3':'이동도',
-  '4.1':'확산전류','4.2':'확산계수','4.3':'연속방정식','5.1':'생성/재결합',
-  '5.2':'연속방정식 일반형','5.3':'SRH 이론','6.1':'PN접합 이론','6.2':'DC 모델',
-  '6.3':'커패시턴스','6.4':'축적 전하','6.5':'금속-반도체','7.1':'MOS 커패시터',
-  '7.2':'MOSFET 원리','7.3':'I-V 특성','7.4':'2차 효과','7.5':'나노 MOSFET','7.6':'메모리'
+
+// ══════════ TEXTBOOK (정식 출시 때는 빈 객체 {} 로 시작합니다) ══════════
+const library = {
+  "반도체 소자 원리": {
+    "1.1 원자 및 결정 구조": { "1.1.1": "원자 결합", "1.1.2": "3차원 결정 구조", "1.1.3": "그래핀/탄소나노튜브" },
+    "1.2 전류 반송자와 도핑": { "1.2.1": "전류 반송자", "1.2.2": "N형/P형 도핑", "1.2.3": "전기적 중성 방정식", "1.2.4": "열평형 생성/재결합" },
+    "1.3 결정 성장 및 도핑": { "1.3.1": "결정 성장", "1.3.2": "도핑 기술" },
+    "2.1 양자역학 기초": { "2.1.1": "드 브로이 관계", "2.1.2": "파동함수와 파속", "2.1.3": "슈뢰딩거 방정식" },
+    "2.2 에너지 대역": { "2.2.1": "원자 구조", "2.2.2": "금속 에너지 대역", "2.2.3": "에너지 간격/대역" },
+    "2.3 상태 밀도": { "2.3.1": "유효 질량/E-k 도식", "2.3.2": "불확정성 원리", "2.3.3": "상태 밀도" },
+    "2.4 페르미 분포": { "2.4.1": "페르미-디락 분포", "2.4.2": "맥스웰-볼츠만/유효상태밀도", "2.4.3": "페르미 전위/도핑", "2.4.4": "의사 페르미 준위" },
+    "3.1 표동전류": { "3.1.1": "표동전류 에너지 대역", "3.1.2": "산란과 저항/전력" },
+    "3.2 저항과 전도도": { "3.2.1": "집적회로 저항 설계", "3.2.2": "옴의 법칙 미분형", "3.2.3": "전기전도도 구성요소" },
+    "3.3 이동도": { "3.3.1": "열속도/표동속도", "3.3.2": "이동도 정의", "3.3.3": "산란 시간/단면적", "3.3.4": "매티슨 법칙", "3.3.5": "홀 효과" },
+    "4.1 확산전류": { "4.1": "확산-전류 방정식" },
+    "4.2 아인슈타인 관계": { "4.2.1": "아인슈타인 관계", "4.2.2": "하인스-쇼클리 실험", "4.2.3": "아레니우스 식" },
+    "4.3 연속 방정식": { "4.3": "연속 방정식 기본형" },
+    "5.1 생성/재결합": { "5.1": "생성/재결합 원리" },
+    "5.2 반송자 수명": { "5.2.1": "재결합률/생성률", "5.2.2": "소수 반송자 수명", "5.2.3": "확산 거리" },
+    "5.3 SRH 이론": { "5.3.1": "포획률/방출률", "5.3.2": "SRH 정상상태 방정식", "5.3.3": "특수 경우(저주입/공핍)", "5.3.4": "표면 생성/재결합" },
+    "6.1 PN접합": { "6.1.1": "PN접합 열평형", "6.1.2": "역방향 바이어스 PN접합", "6.1.3": "순방향 바이어스 PN접합", "6.1.4": "항복 현상" },
+    "6.2 I-V 특성": { "6.2.1": "I-V 방정식", "6.2.2": "2차 효과", "6.2.3": "온도 영향" },
+    "6.3 커패시턴스": { "6.3.1": "C-V 의존성", "6.3.2": "공핍층 폭/포아송 방정식", "6.3.3": "접합 커패시턴스 SPICE모델" },
+    "6.4 과도 응답": { "6.4.1": "축적 전하/전이 시간", "6.4.2": "전이 시간/소수 반송자 수명", "6.4.3": "역회복 시간" },
+    "6.5 금속-반도체": { "6.5.1": "쇼트키 다이오드", "6.5.2": "저항성 금속-반도체 접촉" },
+    "7.1 MOS 커패시터": { "7.1.1": "게이트 산화막/계면", "7.1.2": "C-V곡선/게이트 전압", "7.1.3": "MOS 에너지 대역도", "7.1.4": "평탄 대역/드바이 길이" },
+    "7.2 MOSFET 기본": { "7.2.1": "MOSFET 구조", "7.2.2": "전압 제어 스위치", "7.2.3": "문턱 전압/몸체 효과", "7.2.4": "전압 제어 전류원/포화" },
+    "7.3 SPICE 모델": { "7.3.1": "SPICE LEVEL 1", "7.3.2": "SPICE LEVEL 2", "7.3.3": "SPICE LEVEL 3" },
+    "7.4 2차 효과": { "7.4.1": "이동도 감소(게이트)", "7.4.2": "속도 포화", "7.4.3": "유한 출력 저항", "7.4.4": "단채널 효과", "7.4.5": "협폭 채널 효과", "7.4.6": "문턱 전압 이하 전류" },
+    "7.5 나노 소자": { "7.5.1": "크기 감소 규칙", "7.5.2": "누설 전류", "7.5.3": "진보된 MOSFET" },
+    "7.6 메모리": { "7.6.1": "1C1T DRAM 셀", "7.6.2": "플래시 메모리 셀" }
+  },
+  "공업수학": {
+    "Part A. 상미분방정식": {
+      "A.1": "1계 상미분방정식", "A.2": "2계 선형상미분방정식", "A.3": "고계 선형상미분방정식",
+      "A.4": "연립상미분방정식. 위상평면. 정성법", "A.5": "상미분방정식의 급수해. 특수함수", "A.6": "Laplace 변환"
+    },
+    "Part B. 선형대수/벡터": {
+      "B.7": "행렬, 벡터, 행렬식, 선형연립방정식", "B.8": "행렬의 고유값 문제",
+      "B.9": "벡터미분. 기울기. 발산, 회전", "B.10": "벡터적분. 적분정리"
+    },
+    "Part C. 푸리에/편미방": { "C.11": "Fourier 해석", "C.12": "편미분방정식" },
+    "Part D. 복소해석": {
+      "D.13": "복소수와 복소함수. 복소미분", "D.14": "복소적분", "D.15": "거듭제곱 급수, Taylor 급수",
+      "D.16": "Laurent 급수. 유수적분", "D.17": "등각사상", "D.18": "복소해석과 퍼텐셜이론"
+    },
+    "Part E. 수치해법": { "E.19": "일반적인 수치해법", "E.20": "선형대수의 수치해법", "E.21": "상미분방정식과 편미분방정식의 수치해법" },
+    "Part F. 최적화/그래프": { "F.22": "무제약 최적화. 선형계획법", "F.23": "그래프. 조합 최적화" }
+  }
 };
 
+  
 const TRIGGERS = /이해했|알겠|다음\s*(문제|단원)|넘어가|고마워|감사|됐어|ok|오케이|ㅇㅋ/i;
 
 // ══════════ STATE ══════════
@@ -456,19 +518,70 @@ function startChat(){
  function showScreen(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
 
 // ══════════ SUBJECT ══════════
-function buildSubjList(){
-  const l=document.getElementById('subjList'); l.innerHTML='';
-  const all=document.createElement('div'); all.className='subj-item'+(subj===null?' active':'');
-  all.innerHTML='<span class="subj-num">—</span>전체 단원'; all.onclick=()=>setSubj(null); l.appendChild(all);
-  Object.entries(TB).forEach(([n,nm])=>{
-    const d=document.createElement('div'); d.className='subj-item'+(subj===n?' active':'');
-    d.innerHTML=`<span class="subj-num">${n}</span>${nm}`; d.onclick=()=>setSubj(n); l.appendChild(d);
-  });
-}
-function setSubj(n){ subj=n; document.getElementById('subjPill').textContent=n?`§${n} ${TB[n]}`:'전체 단원'; buildSubjList(); closeSubjPanel(); }
-function openSubjPanel(){ document.getElementById('subjPanel').classList.add('open'); }
-function closeSubjPanel(){ document.getElementById('subjPanel').classList.remove('open'); }
+// 각 단원별 저장된 ★ 개수를 가져옵니다. (없으면 0)
+let starCounts = JSON.parse(localStorage.getItem('starCounts')) || {};
 
+function buildSubjList(){
+  const l = document.getElementById('subjList');
+  l.innerHTML = '';
+
+  for (const [book, groups] of Object.entries(library)) {
+    // 대단원 (교재 이름)
+    let bookHtml = `<div class="binder-category">
+      <div class="category-title collapsed" onclick="this.nextElementSibling.classList.toggle('hidden'); this.classList.toggle('collapsed')">📁 ${book}</div>
+      <div class="chapter-list hidden">`;
+
+    for (const [group, units] of Object.entries(groups)) {
+      // 중단원
+      bookHtml += `<div style="margin: 12px 0 6px 4px; color: var(--text); font-weight: 600; font-size: 13.5px;">${group}</div>`;
+      
+      for (const [id, name] of Object.entries(units)) {
+        // 소단원 및 ★ 개수 표시
+        const count = starCounts[id] || 0;
+        bookHtml += `
+          <div class="subj-item" onclick="setSubj('${id}')" style="justify-content: space-between;">
+            <span style="flex:1;"><span class="subj-num" style="display:inline-block; width:45px;">${id}</span> ${name}</span>
+            <span class="star-count" style="color:var(--amber); font-weight:bold; font-size:12px;">★:${count}</span>
+          </div>`;
+      }
+    }
+    bookHtml += `</div></div>`;
+    l.innerHTML += bookHtml;
+  }
+}
+
+// 프롬프트에 넣기 위해 교재명(단원 번호)을 찾는 유틸리티 (수정됨)
+function getSubjectName(targetId) {
+  for (const book of Object.values(library)) {
+    for (const units of Object.values(book)) {
+      if (units[targetId]) return units[targetId];
+    }
+  }
+  return '';
+}
+
+// 기존 setSubj 함수 약간 수정
+function setSubj(n){ 
+  subj = n; 
+  document.getElementById('subjPill').textContent = n ? `📚 binder` : '📚 binder'; // 버튼 이름은 항상 고정
+  buildSubjList(); 
+  closeSubjPanel(); 
+}
+
+// 시스템 프롬프트 업데이트 (TB[subj] 대신 getSubjectName(subj) 사용)
+function sysPrompt(){
+  const s = subj ? `현재 학습 단원: §${subj} ${getSubjectName(subj)}\n` : '';
+  return `당신은 학습전용AI입니다. 답변은 간결하고 사무적인 말투 위주로 해주세요. \n${s}규칙: 수식은 LaTeX($...$), 단계별 풀이, 하나의 답변에 중복 설명 절대 금지, 항상 짧고 명료하게, 
+  수식 설명시 변수 옆에 한글로 괄호치고 붙여서 설명하지 말고 수식만 있도록 깔끔하게 설명하고 수식도 한 답변에 3개 초과하지 않도록 조심 (넘어도 되지만 되도록 넘지 않도록), 
+  특정 변수에 대해 직접적으로 묻지 않는다면 변수 설명은 1번 초과 금지,
+  유도 과정은 설명이 긴 관계로 직접적으로 묻지 않는 이상 금지,
+  너가 gemini면 8192토큰 제한이니 넘지 않도록 설명, 
+  너가 Claude면 4096 토큰 제한이니 넘지 않도록 설명, 
+  한국어 답변.`;
+}
+ 
+
+  
 // ══════════ ATTACHMENT ══════════
 function openAtt(){ document.getElementById('attMenu').classList.add('open'); document.getElementById('attOv').classList.add('show'); }
 function closeAtt(){ document.getElementById('attMenu').classList.remove('open'); document.getElementById('attOv').classList.remove('show'); }
@@ -491,7 +604,9 @@ function renderImgPreviews(){
     w.appendChild(d);
   });
 }
-function rmImg(i){ imgs.splice(i,1); renderImgPreviews(); }
+function rmIm
+  
+  g(i){ imgs.splice(i,1); renderImgPreviews(); }
 
 // ══════════ RENDERING ══════════
 function esc(t){ return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }

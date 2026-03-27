@@ -581,63 +581,81 @@ function sysPrompt(){
 }
 
 // ══════════ GEMINI STREAMING ══════════
-async function streamGemini(bbl){
-  ctrl=new AbortController();
-  const contents=messages.map(m=>{
-    if(typeof m.content==='string') return{role:m.role==='assistant'?'model':'user',parts:[{text:m.content}]};
-    const parts=m.content.map(p=>{
-      if(p.type==='text')return{text:p.text};
-      if(p.type==='image_url'){const b64=p.image_url.url.split(',')[1],mt=p.image_url.url.split(';')[0].split(':')[1];return{inlineData:{mimeType:mt,data:b64}};}
-      return{text:''};
-    });
-    return{role:'user',parts};
-  });
-  const body={system_instruction:{parts:[{text:sysPrompt()}]},contents,generationConfig:{temperature:0.7,maxOutputTokens:2048}};
-
-  const url=`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${apiKey}`;
-
-  const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:ctrl.signal});
-  if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`HTTP ${res.status}`);}
-  const reader=res.body.getReader(),dec=new TextDecoder();
-  let full=''; bbl.innerHTML='';
-  while(true){
-    // 기존 streamGemini 함수 내부의 while 루프 전체를 아래 코드로 교체하세요!
-  const reader=res.body.getReader(),dec=new TextDecoder();
-  let full='', buffer=''; bbl.innerHTML='';
+async function streamGemini(bbl) {
+  ctrl = new AbortController();
   
-  while(true){
-    const{done,value}=await reader.read(); 
-    if(done) break;
-    
+  // 1. 메시지 포맷팅
+  const contents = messages.map(m => {
+    if (typeof m.content === 'string') return { role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] };
+    const parts = m.content.map(p => {
+      if (p.type === 'text') return { text: p.text };
+      if (p.type === 'image_url') {
+        const b64 = p.image_url.url.split(',')[1], mt = p.image_url.url.split(';')[0].split(':')[1];
+        return { inlineData: { mimeType: mt, data: b64 } };
+      }
+      return { text: '' };
+    });
+    return { role: 'user', parts };
+  });
+
+  const body = {
+    system_instruction: { parts: [{ text: sysPrompt() }] },
+    contents,
+    generationConfig: { temperature: 0.7, maxOutputTokens: 2048 }
+  };
+
+  // 2. 정확한 최신 URL
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?alt=sse&key=${apiKey}`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: ctrl.signal
+  });
+
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({}));
+    throw new Error(e.error?.message || `HTTP ${res.status}`);
+  }
+
+  // 3. 스트리밍 읽기 (여기서 getReader는 딱 한 번만 실행됨!)
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let full = '', buffer = '';
+  bbl.innerHTML = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
     // 조각난 데이터를 버퍼에 모아서 온전한 줄바꿈(\n) 단위로만 처리
-    buffer += dec.decode(value, {stream: true});
+    buffer += dec.decode(value, { stream: true });
     const lines = buffer.split('\n');
     buffer = lines.pop(); // 마지막 줄은 덜 완성됐을 수 있으니 다음 턴으로 넘김
-    
-    for(const line of lines){
-      if(!line.startsWith('data: '))continue;
-      const js=line.slice(6).trim(); 
-      if(js==='[DONE]')continue;
-      try{
-        const d=JSON.parse(js);
-        const t=d.candidates?.[0]?.content?.parts?.[0]?.text||'';
-        if(t){
-            full+=t; 
-            bbl.innerHTML=render(full); 
-            scroll();
+
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const js = line.slice(6).trim();
+      if (js === '[DONE]') continue;
+      try {
+        const d = JSON.parse(js);
+        const t = d.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        if (t) {
+          full += t;
+          bbl.innerHTML = render(full);
+          scroll(); // 스크롤을 맨 아래로!
         }
-      }catch(e){
-        // 에러가 나도 멈추지 않고 계속 진행
-        console.warn("JSON Parse Error skipped", e);
+      } catch (e) {
+        // 끊긴 JSON 조각은 무시하고 계속 진행
       }
     }
   }
   return full;
-
-  }
-  return full;
 }
 
+
+  
 // ══════════ CLAUDE STREAMING ══════════
 async function streamClaude(bbl){
   ctrl=new AbortController();
@@ -650,27 +668,43 @@ async function streamClaude(bbl){
     });
     return{role:m.role,content};
   });
-  // Claude needs direct browser access header or go through /api/chat proxy
+  
   const res=await fetch('https://api.anthropic.com/v1/messages',{
     method:'POST',
     headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-    body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:2048,system:sysPrompt(),messages:claudeMsgs,stream:true}),
+    body:JSON.stringify({model:'claude-3-haiku-20240307',max_tokens:2048,system:sysPrompt(),messages:claudeMsgs,stream:true}),
     signal:ctrl.signal
   });
+  
   if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`HTTP ${res.status}`);}
+  
   const reader=res.body.getReader(),dec=new TextDecoder();
-  let full=''; bbl.innerHTML='';
+  let full='', buffer=''; bbl.innerHTML='';
+  
   while(true){
     const{done,value}=await reader.read(); if(done)break;
-    const lines=dec.decode(value).split('\n');
+    
+    // 조각난 데이터 모아서 처리 (끊김 방지)
+    buffer += dec.decode(value, {stream: true});
+    const lines = buffer.split('\n');
+    buffer = lines.pop(); 
+    
     for(const line of lines){
       if(!line.startsWith('data: '))continue;
       const js=line.slice(6).trim();
-      try{const d=JSON.parse(js);if(d.type==='content_block_delta'){const t=d.delta?.text||'';if(t){full+=t;bbl.innerHTML=render(full);scroll();}}}catch{}
+      if(js==='[DONE]')continue;
+      try{
+        const d=JSON.parse(js);
+        if(d.type==='content_block_delta'){
+          const t=d.delta?.text||'';
+          if(t){full+=t;bbl.innerHTML=render(full);scroll();}
+        }
+      }catch(e){} // 덜 온 조각은 무시
     }
   }
   return full;
 }
+
 
 // ══════════ BACKGROUND SUMMARIZE ══════════
 async function bgSummarize(){

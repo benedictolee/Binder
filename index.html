@@ -224,14 +224,14 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
   color:var(--text2);cursor:pointer;transition:all .15s;background:var(--bg3);}
 .chip:hover{border-color:var(--accent);color:var(--text);}
 
-/* 사이드바 반응형 (PC/패드에서 90% 덮기) */
-@media (min-width: 768px) {
-  .subj-panel { width: 90vw !important; max-width: none; border-left: 1px solid var(--border); }
-}
 
-/* 폴더 아코디언 스타일 */
+  /* 사이드바 반응형 (모든 화면에서 무조건 90% 덮기) */
+.subj-panel { width: 90vw !important; max-width: none; border-left: 1px solid var(--border); }
+
+/* 2단 폴더 아코디언 스타일 */
 .hidden { display: none !important; }
 .binder-category { margin-bottom: 8px; }
+/* 1단: 과목명 (예: 반도체 소자 원리) */
 .category-title { 
   font-weight: 600; color: var(--text); padding: 12px 14px; 
   background: var(--bg3); border-radius: 10px; cursor: pointer;
@@ -241,9 +241,21 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .category-title:hover { border-color: var(--accent); }
 .category-title::after { content: '▾'; color: var(--text2); }
 .category-title.collapsed::after { content: '▸'; }
-.chapter-list { margin-left: 10px; padding-bottom: 10px; border-left: 1px solid var(--border2); padding-left: 10px; margin-top: 6px; }
 
-  
+/* 2단: 대단원 묶음 (예: 1.1 원자 및 결정 구조) */
+.chapter-group { margin-top: 6px; }
+.group-title {
+  padding: 10px 12px; margin: 4px 0; color: var(--text2); font-weight: 500; font-size: 13.5px;
+  cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+  border-radius: 8px; transition: background 0.15s;
+}
+.group-title:hover { background: rgba(255, 255, 255, 0.05); color: var(--text); }
+.group-title::after { content: '▾'; font-size: 11px; }
+.group-title.collapsed::after { content: '▸'; }
+
+/* 3단: 최종 소단원 목록 (예: 1.1.1 원자 결합) */
+.chapter-list { margin-left: 14px; padding-bottom: 6px; border-left: 1px dashed var(--border2); padding-left: 10px; }
+
 /* LIGHTBOX */
 #lightbox{position:fixed;inset:0;z-index:999;background:rgba(0,0,0,.93);
   display:none;align-items:center;justify-content:center;}
@@ -526,29 +538,33 @@ function buildSubjList(){
   l.innerHTML = '';
 
   for (const [book, groups] of Object.entries(library)) {
-    // 대단원 (교재 이름)
+    // 1단: 과목명 (클릭 시 닫힘 상태로 시작)
     let bookHtml = `<div class="binder-category">
       <div class="category-title collapsed" onclick="this.nextElementSibling.classList.toggle('hidden'); this.classList.toggle('collapsed')">📁 ${book}</div>
-      <div class="chapter-list hidden">`;
+      <div class="hidden">`; // 과목 안의 내용물 전체를 감싸는 div (초기 숨김)
 
     for (const [group, units] of Object.entries(groups)) {
-      // 중단원
-      bookHtml += `<div style="margin: 12px 0 6px 4px; color: var(--text); font-weight: 600; font-size: 13.5px;">${group}</div>`;
+      // 2단: 대단원 (클릭 시 닫힘 상태로 시작)
+      bookHtml += `<div class="chapter-group">
+        <div class="group-title collapsed" onclick="this.nextElementSibling.classList.toggle('hidden'); this.classList.toggle('collapsed')">${group}</div>
+        <div class="chapter-list hidden">`; // 대단원 안의 소단원들을 감싸는 div (초기 숨김)
       
       for (const [id, name] of Object.entries(units)) {
-        // 소단원 및 ★ 개수 표시
+        // 3단: 소단원 아이템 및 ★ 표시
         const count = starCounts[id] || 0;
         bookHtml += `
-          <div class="subj-item" onclick="setSubj('${id}')" style="justify-content: space-between;">
+          <div class="subj-item" onclick="setSubj('${id}')" style="justify-content: space-between; padding: 8px 10px;">
             <span style="flex:1;"><span class="subj-num" style="display:inline-block; width:45px;">${id}</span> ${name}</span>
             <span class="star-count" style="color:var(--amber); font-weight:bold; font-size:12px;">★:${count}</span>
           </div>`;
       }
+      bookHtml += `</div></div>`; // 2단 닫기
     }
-    bookHtml += `</div></div>`;
+    bookHtml += `</div></div>`; // 1단 닫기
     l.innerHTML += bookHtml;
   }
 }
+
 
 // 프롬프트에 넣기 위해 교재명(단원 번호)을 찾는 유틸리티 (수정됨)
 function getSubjectName(targetId) {

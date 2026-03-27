@@ -443,11 +443,13 @@ let provider='gemini', apiKey='', messages=[], imgs=[], streaming=false, ctrl=nu
 function checkKey(){ document.getElementById('obStart').disabled = document.getElementById('apiKeyInput').value.trim().length<10; }
 function toggleEye(){ const i=document.getElementById('apiKeyInput'); i.type=i.type==='password'?'text':'password'; }
 function startChat(){
+  
   const v=document.getElementById('apiKeyInput').value.trim(); if(!v)return;
   apiKey=v; localStorage.setItem('ab_key',v); localStorage.setItem('ab_prov',provider);
   document.getElementById('keyBadgeTxt').textContent = provider==='gemini' ? 'Gemini' : (provider==='claude' ? 'Claude' : 'GPT');
   showScreen('screen-chat'); buildSubjList();
 }
+ function showScreen(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
 
 // ══════════ SUBJECT ══════════
 function buildSubjList(){

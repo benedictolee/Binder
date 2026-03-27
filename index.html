@@ -589,7 +589,13 @@ function setSend(m){
 // ══════════ SYSTEM PROMPT ══════════
 function sysPrompt(){
   const s=subj?`현재 학습 단원: §${subj} ${TB[subj]}\n`:'';
-  return `당신은 학습전용AI입니다. 답변은 간결하고 사무적인 말투 위주로 해주세요. \n${s}규칙: 수식은 LaTeX($...$), 단계별 풀이, 한국어 답변.`;
+  return `당신은 학습전용AI입니다. 답변은 간결하고 사무적인 말투 위주로 해주세요. \n${s}규칙: 수식은 LaTeX($...$), 단계별 풀이, 하나의 답변에 중복 설명 절대 금지, 항상 짧고 명료하게, 
+  수식 설명시 변수 옆에 한글로 괄호치고 붙여서 설명하지 말고 수식만 있도록 깔끔하게 설명하고 수식도 한 답변에 3개 초과하지 않도록 조심 (넘어도 되지만 되도록 넘지 않도록), 
+  특정 변수에 대해 직접적으로 묻지 않는다면 변수 설명은 1번 초과 금지,
+  유도 과정은 설명이 긴 관계로 직접적으로 묻지 않는 이상 금지,
+  너가 gemini면 8192토큰 제한이니 넘지 않도록 설명, 
+  너가 Claude면 4096 토큰 제한이니 넘지 않도록 설명, 
+  한국어 답변.`;
 }
 // ══════════ GEMINI (비동기 일괄 수신 & 검열 필터 해제!) ══════════
 async function streamGemini(bbl) {
@@ -609,7 +615,7 @@ async function streamGemini(bbl) {
   const body = { 
     system_instruction: { parts: [{ text: sysPrompt() }] }, 
     contents, 
-    generationConfig: { temperature: 0.7, maxOutputTokens: 4096 }, // 혹시 몰라 길이도 2배로 늘렸습니다!
+    generationConfig: { temperature: 0.7, maxOutputTokens: 8192}, // 혹시 몰라 길이도 2배로 늘렸습니다!
     // 👇 바로 이 부분이 핵심입니다! 모든 검열 필터를 끕니다.
     safetySettings: [
       { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
@@ -652,7 +658,7 @@ async function streamClaude(bbl) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
     // stream: true를 빼버렸습니다!
-    body: JSON.stringify({ model: 'claude-3-haiku-20240307', max_tokens: 2048, system: sysPrompt(), messages: claudeMsgs })
+    body: JSON.stringify({ model: 'claude-3-haiku-20240307', max_tokens: 4096, system: sysPrompt(), messages: claudeMsgs })
   });
   
   if (!res.ok) throw new Error(`HTTP ${res.status}`);

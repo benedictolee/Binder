@@ -589,7 +589,7 @@ function setSend(m){
 // ══════════ SYSTEM PROMPT ══════════
 function sysPrompt(){
   const s=subj?`현재 학습 단원: §${subj} ${TB[subj]}\n`:'';
-  return `당신은 이공계 학생의 AI 튜터입니다.\n${s}규칙: 수식은 LaTeX($...$), 물리 직관 우선, 단계별 풀이, 한국어 답변.`;
+  return `당신은 학습전용AI입니다. 답변은 간결하고 사무적인 말투 위주로 해주세요. \n${s}규칙: 수식은 LaTeX($...$), 단계별 풀이, 한국어 답변.`;
 }
 
      // ══════════ GEMINI (비동기 일괄 수신) ══════════

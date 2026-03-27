@@ -35,7 +35,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;fon
 .ob-card{width:100%;max-width:420px;background:var(--bg2);border:1px solid var(--border2);
   border-radius:24px;padding:36px 32px;animation:fadeUp .5s ease both; position: relative;}
  .ob-close{position:absolute;top:20px;right:24px;background:none;border:none;
-  color:var(--text2);font-size:22px;cursor:pointer;display:none;transition:color .15s;}
+  color:var(--text2);font-size:22px;cursor:pointer;transition:color .15s;}
 .ob-close:hover{color:var(--text);}
 @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 .ob-logo{font-family:'Instrument Serif',serif;font-size:28px;color:var(--text);
@@ -241,6 +241,7 @@ input[type=file]{display:none;}
 <!-- ══ SCREEN 1: ONBOARDING ══ -->
 <div class="screen" id="screen-onboard">
   <div class="ob-card">
+    <button class="ob-close" onclick="showScreen('screen-chat')">✕</button>
     <div class="ob-logo">A<em>+</em> Binder</div>
     <p class="ob-sub">AI 튜터와 대화하며 공부하면,<br>나만의 비법 노트가 자동 완성돼요.</p>
 

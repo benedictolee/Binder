@@ -579,7 +579,9 @@ async function streamGemini(bbl){
     return{role:'user',parts};
   });
   const body={system_instruction:{parts:[{text:sysPrompt()}]},contents,generationConfig:{temperature:0.7,maxOutputTokens:2048}};
-  const url=`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:streamGenerateContent?alt=sse&key=${apiKey}`;
+
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?key=${apiKey}`;
+
   const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:ctrl.signal});
   if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e.error?.message||`HTTP ${res.status}`);}
   const reader=res.body.getReader(),dec=new TextDecoder();

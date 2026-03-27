@@ -546,7 +546,25 @@ function showTrigger(){
 
 // ══════════ SEND ══════════
 function resizeBox(el){ el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,160)+'px'; }
-function onKey(e){ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); send(); } }
+function onKey(e){ 
+  // 1. 한글 자음/모음 조합 중일 때는 엔터키 무시 (글자 씹힘 방지)
+  if (e.isComposing) return;
+
+  if (e.key === 'Enter' && !e.shiftKey) {
+    // 2. 현재 접속한 기기가 모바일(스마트폰/태블릿)인지 확인
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+      // 모바일이면 여기서 멈춤! 자연스럽게 다음 줄로 넘어감 (전송 버튼을 직접 눌러야 함)
+      return; 
+    } else {
+      // PC면 줄바꿈 막고 냅다 전송!
+      e.preventDefault(); 
+      send(); 
+    }
+  } 
+}
+
 function suggest(t){ document.getElementById('chatInput').value=t; document.getElementById('chatInput').focus(); }
 
 async function send(){

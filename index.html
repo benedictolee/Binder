@@ -828,6 +828,7 @@ function rmImg(i){ imgs.splice(i,1); renderImgPreviews(); }
 function esc(t){ return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function render(text){
   let h=esc(text);
+  h = h.replace(/&lt;/g, '<').replace(/&gt;/g, '>'); 
   // 수식 (LaTeX)
   h=h.replace(/\$\$([^$]+)\$\$/g,(_,e)=>{ try{const s=document.createElement('span');katex.render(e.trim(),s,{throwOnError:false,displayMode:true});return s.outerHTML;}catch{return`<code>$$${e}$$</code>`;}});
   h=h.replace(/\$([^$\n]+)\$/g,(_,e)=>{ try{const s=document.createElement('span');katex.render(e.trim(),s,{throwOnError:false,displayMode:false});return s.outerHTML;}catch{return`<code>$${e}$</code>`;}});

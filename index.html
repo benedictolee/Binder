@@ -1042,7 +1042,6 @@ async function streamGPT(bbl) {
 }
 
 
-
 // ══════════ BACKGROUND AUTO SAVE (클라우드 연동 버전) ══════════
 async function autoSaveToBinder(userText, aiText, btnElement) {
   try {
@@ -1064,7 +1063,13 @@ async function autoSaveToBinder(userText, aiText, btnElement) {
     if (provider === 'gemini') {
        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }] }) });
        resultText = (await res.json()).candidates?.[0]?.content?.parts?.[0]?.text || '';
-    } // ... (claude, gpt 생략 - 기존 코드 유지해도 됨)
+    } else if (provider === 'claude') {
+       const res = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' }, body: JSON.stringify({ model: 'claude-3-haiku-20240307', max_tokens: 1024, messages: [{role: "user", content: prompt}] }) });
+       resultText = (await res.json()).content?.[0]?.text || '';
+    } else if (provider === 'gpt') {
+       const res = await fetch('https://api.openai.com/v1/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` }, body: JSON.stringify({ model: 'gpt-4o-mini', messages: [{role: "user", content: prompt}] }) });
+       resultText = (await res.json()).choices?.[0]?.message?.content || '';
+    }
 
     const jsonMatch = resultText.match(/\{[\s\S]*\}/);
     if(!jsonMatch) throw new Error("분류 실패");
@@ -1073,11 +1078,14 @@ async function autoSaveToBinder(userText, aiText, btnElement) {
     const summary = parsed.summary;
     const noteContent = `> **Q. ${userText}**\n\n${summary}`;
 
-    // ☁️ [수정됨] 파이어베이스(클라우드)에 저장!
     if (window.currentUser) {
       const userNotesRef = window.fbDoc(window.fbDb, "users", window.currentUser.uid);
       const docSnap = await window.fbGetDoc(userNotesRef);
-      let data = docSnap.exists() ? docSnap.data() : { savedNotes: {}, starCounts: {} };
+      
+      // 🚨 핵심 수정 부분: 옛날 기차 데이터가 있으면 부수고 새 서랍장으로 리셋!
+      let data = docSnap.exists() ? docSnap.data() : {};
+      if (!data.savedNotes || Array.isArray(data.savedNotes)) data.savedNotes = {};
+      if (!data.starCounts) data.starCounts = {};
       
       if (!data.savedNotes[targetId]) data.savedNotes[targetId] = [];
       data.savedNotes[targetId].push(noteContent);
@@ -1085,9 +1093,8 @@ async function autoSaveToBinder(userText, aiText, btnElement) {
       
       await window.fbSetDoc(userNotesRef, data);
       
-      btnElement.innerHTML = `☁️ [${targetId}] 단원에 클라우드 저장 완료!`;
+      btnElement.innerHTML = `☁️ [${targetId}] 단원에 저장 완료!`;
     } else {
-      // 📱 로그아웃 상태일 때 기존 로컬 저장
       let starCounts = JSON.parse(localStorage.getItem('starCounts')) || {};
       starCounts[targetId] = (starCounts[targetId] || 0) + 1;
       localStorage.setItem('starCounts', JSON.stringify(starCounts));
@@ -1103,11 +1110,14 @@ async function autoSaveToBinder(userText, aiText, btnElement) {
 
   } catch (e) {
     console.error("Auto Save Error:", e);
+    // 🚨 에러가 나면 팝업창으로 무슨 에러인지 멱살 잡고 보여주기!
+    alert("저장 에러 발생: " + e.message);
     btnElement.innerHTML = '★ 저장 실패 (다시 시도)';
     btnElement.classList.remove('saved');
     btnElement.dataset.saved = "";
   }
 }
+
 
 
     

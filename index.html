@@ -655,14 +655,14 @@ function startChat(){
 }
  function showScreen(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
 
-// ══════════ SUBJECT ══════════
-// 각 단원별 저장된 ★ 개수를 가져옵니다. (없으면 0)
 
+
+  // ══════════ SUBJECT & BINDER LIST ══════════
 function buildSubjList(){
   let starCounts = JSON.parse(localStorage.getItem('starCounts')) || {};
   const l = document.getElementById('subjList');
-    // 👇 추가할 코드: 사이드바 맨 위에 버튼 렌더링
-    // 👇 수정할 부분: 사이드바 맨 위 버튼 렌더링 (설정 버튼 추가)
+  
+  // 사이드바 맨 위 버튼들 (새 교재 추가 & 프롬프트 설정)
   l.innerHTML = `
     <div style="display:flex; gap:8px; margin-bottom:15px;">
       <button class="add-book-btn" style="margin-bottom:0; flex:1;" onclick="openAddBookModal()">+ 📚 새 교재 추가</button>
@@ -671,19 +671,33 @@ function buildSubjList(){
   `;
 
   for (const [book, groups] of Object.entries(library)) {
-    // 1단: 과목명 (클릭 시 닫힘 상태로 시작)
+    // 1단: 과목명
     let bookHtml = `<div class="binder-category">
       <div class="category-title collapsed" onclick="this.nextElementSibling.classList.toggle('hidden'); this.classList.toggle('collapsed')">📁 ${book}</div>
-      <div class="hidden">`; // 과목 안의 내용물 전체를 감싸는 div (초기 숨김)
+      <div class="hidden">`;
 
     for (const [group, units] of Object.entries(groups)) {
-      // 2단: 대단원 (클릭 시 닫힘 상태로 시작)
+      
+      // ⭐ [핵심 추가 로직] 이 중단원 안의 소단원 중에 별이 하나라도 있는지 검사!
+      let hasStar = false;
+      for (const id of Object.keys(units)) {
+        if (starCounts[id] > 0) {
+          hasStar = true;
+          break; // 하나라도 찾으면 더 검사할 필요 없이 탈출
+        }
+      }
+      // 별이 있으면 예쁜 주황색 별 아이콘을 달아줍니다.
+      const starBadge = hasStar ? `<span style="color:var(--amber); margin-left:6px; font-size:13px;">★</span>` : '';
+
+      // 2단: 대단원(중단원) 렌더링 시 별 아이콘 같이 출력
       bookHtml += `<div class="chapter-group">
-        <div class="group-title collapsed" onclick="this.nextElementSibling.classList.toggle('hidden'); this.classList.toggle('collapsed')">${group}</div>
-        <div class="chapter-list hidden">`; // 대단원 안의 소단원들을 감싸는 div (초기 숨김)
+        <div class="group-title collapsed" onclick="this.nextElementSibling.classList.toggle('hidden'); this.classList.toggle('collapsed')">
+          <span>${group}${starBadge}</span>
+        </div>
+        <div class="chapter-list hidden">`;
       
       for (const [id, name] of Object.entries(units)) {
-        // 3단: 소단원 아이템 및 ★ 표시
+        // 3단: 소단원 아이템 및 ★ 개수 표시
         const count = starCounts[id] || 0;
         bookHtml += `
           <div class="subj-item" onclick="openNote('${id}')" style="justify-content: space-between; padding: 8px 10px;">
@@ -697,7 +711,7 @@ function buildSubjList(){
     l.innerHTML += bookHtml;
   }
 }
-
+ 
 
 // 프롬프트에 넣기 위해 교재명(단원 번호)을 찾는 유틸리티 (수정됨)
 function getSubjectName(targetId) {

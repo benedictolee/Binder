@@ -300,10 +300,13 @@ input[type=file]{display:none;}
   padding: 20px; overflow-y: auto; flex: 1; color: var(--text); font-size: 14.5px; line-height: 1.7;
 }
 /* 저장된 개별 노트 아이템 */
+/* 수정된 4단계: 개별 노트 아이템 (버튼 안 겹치게 위쪽 패딩 확보) */
 .saved-item {
   background: var(--bg3); border: 1px solid var(--border); border-radius: 12px;
-  padding: 16px; margin-bottom: 16px; position: relative;
+  padding: 45px 16px 16px 16px; /* 👈 위쪽 패딩을 45px로 늘림 */
+  margin-bottom: 16px; position: relative;
 }
+
 .saved-item:last-child { margin-bottom: 0; }
 .delete-note-btn {
   position: absolute; top: 12px; right: 12px; background: rgba(248,113,113,0.1);
@@ -336,7 +339,25 @@ input[type=file]{display:none;}
 </style>
 </head>
 <body>
+<div class="note-modal" id="promptModal">
+  <div class="note-card">
+    <div class="note-hdr">
+      <h3 style="display:flex; align-items:center; gap:8px;"><span>⚙️</span> AI 튜터 프롬프트 설정</h3>
+      <button class="note-close" onclick="closePromptModal()">✕</button>
+    </div>
+    <div class="note-body">
+       <p style="font-size:12px; color:var(--text2); margin-bottom:10px;">나만의 AI 튜터 성격을 직접 설정해보세요. (마크다운, LaTeX 지시 등)</p>
+       <textarea id="customPromptInput" class="book-input" rows="12" style="line-height:1.6; font-family:'DM Sans', sans-serif;"></textarea>
+       
+       <button class="ob-start" onclick="savePrompt()">💾 저장하기</button>
+       <button class="ob-start" onclick="resetPrompt()" style="background:transparent; border:1px solid var(--border); color:var(--text2); margin-top:10px;">기본값으로 초기화</button>
+    </div>
+  </div>
+</div>
 
+
+
+  
   <!-- ══  4단계 : 노트 저장 기능 ══ -->
 <div class="note-modal" id="noteModal">
   <div class="note-card">
@@ -641,7 +662,13 @@ function buildSubjList(){
   let starCounts = JSON.parse(localStorage.getItem('starCounts')) || {};
   const l = document.getElementById('subjList');
     // 👇 추가할 코드: 사이드바 맨 위에 버튼 렌더링
-  l.innerHTML = `<button class="add-book-btn" onclick="openAddBookModal()">+ 📚 새 교재 추가하기</button>`;
+    // 👇 수정할 부분: 사이드바 맨 위 버튼 렌더링 (설정 버튼 추가)
+  l.innerHTML = `
+    <div style="display:flex; gap:8px; margin-bottom:15px;">
+      <button class="add-book-btn" style="margin-bottom:0; flex:1;" onclick="openAddBookModal()">+ 📚 새 교재 추가</button>
+      <button class="add-book-btn" style="margin-bottom:0; width:auto; padding:0 15px; font-size:18px;" onclick="openPromptModal()" title="프롬프트 설정">⚙️</button>
+    </div>
+  `;
 
   for (const [book, groups] of Object.entries(library)) {
     // 1단: 과목명 (클릭 시 닫힘 상태로 시작)
@@ -1051,7 +1078,9 @@ ${aiText}
 
     let savedNotes = JSON.parse(localStorage.getItem('savedNotes')) || {};
     if (!savedNotes[targetId]) savedNotes[targetId] = [];
-    savedNotes[targetId].push(summary); // 요약본을 해당 단원 배열에 추가
+        // 질문(userText)을 마크다운 인용구 형태로 요약본 위에 붙여서 저장합니다!
+    const noteContent = `> **Q. ${userText}**\n\n${summary}`;
+    savedNotes[targetId].push(noteContent);  // 요약본을 해당 단원 배열에 추가
     localStorage.setItem('savedNotes', JSON.stringify(savedNotes));
 
     // 6. 버튼 글씨를 바꿔주고, 사이드바를 즉시 새로고침해서 숫자가 올라가는 걸 보여줍니다!
@@ -1302,6 +1331,40 @@ ${rawText}
     btn.disabled = false;
     btn.innerText = "✦ 다시 시도하기";
   }
+}
+
+  // ══════════ PROMPT SETTINGS ══════════
+const DEFAULT_PROMPT = `당신은 전공 학습을 돕는 최고 수준의 AI 튜터입니다. 답변은 간결하고 전문적인 학술 톤을 유지하세요.
+[핵심 규칙]
+1. 사용자 의도 최우선: 사용자가 "유도해 줘", "설명해 줘", "풀어 줘" 등 과정이 필요한 질문을 하면, 반드시 논리적인 순서에 따라 단계별로 상세히 서술하세요.
+2. 수식 형식: 모든 수식은 반드시 LaTeX($...$)를 사용하세요. 
+3. 수식 설명 방식: 수식에 사용된 변수는 수식 내부나 바로 옆에 한글을 덧붙이지 말고, 수식 아래에 별도의 줄로 깔끔하게 정리하세요. (예: $I$: 전류, $V$: 전압)
+4. 중복 금지: 하나의 답변 안에서 동일한 개념이나 변수를 반복해서 설명하지 마세요.
+5. 간결성: 과정이 필요 없는 단순 질문(예: "공식 알려줘")에는 핵심만 짧고 명료하게 답하세요.
+6. 토큰 제한: 너무 길게 말하다가 끊기지 않도록 분량을 적절히 조절하세요.
+7. 언어: 반드시 한국어로 답변하세요.`;
+
+function openPromptModal() {
+  document.getElementById('customPromptInput').value = localStorage.getItem('ab_prompt') || DEFAULT_PROMPT;
+  document.getElementById('promptModal').classList.add('open');
+  closeSubjPanel();
+}
+function closePromptModal() { document.getElementById('promptModal').classList.remove('open'); }
+
+function savePrompt() {
+  localStorage.setItem('ab_prompt', document.getElementById('customPromptInput').value);
+  closePromptModal();
+  alert('프롬프트가 저장되었습니다! 다음 질문부터 적용됩니다.');
+}
+function resetPrompt() {
+  document.getElementById('customPromptInput').value = DEFAULT_PROMPT;
+}
+
+// 기존 sysPrompt() 함수 수정
+function sysPrompt(){
+  const s = subj ? `현재 학습 단원: §${subj} ${getSubjectName(subj)}\n` : '';
+  const p = localStorage.getItem('ab_prompt') || DEFAULT_PROMPT;
+  return s + p;
 }
 
 

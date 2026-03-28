@@ -1430,10 +1430,87 @@ function sysPrompt(){
   return s + p;
 }
 
+// ══════════ 1단계: 클라우드 DB 동기화 (질문+답변 세트) ══════════
+
+// 1. 노트를 '질문+답변 세트'로 클라우드에 저장하는 함수
+async function handleSaveNote() {
+  const currentSummaryBox = document.querySelector('.summary-box:not(.hidden)');
+  if (!currentSummaryBox) return alert("저장할 노트가 없습니다.");
+
+  // 화면에서 사용자의 질문과 AI의 답변을 가져옵니다.
+  const userQueryElement = currentSummaryBox.parentElement.querySelector('.user-msg');
+  const userQuery = userQueryElement ? userQueryElement.innerText : "저장된 질문";
+  const aiAnswer = currentSummaryBox.querySelector('.summary-content').innerHTML; // 수식/HTML 유지
+  const subject = document.getElementById('newSubject') ? document.getElementById('newSubject').value.trim() : '미분류';
+
+  if (window.currentUser) {
+    // ☁️ 로그인 상태: 클라우드 DB(Firebase)에 저장
+    try {
+      const userNotesRef = window.fbDoc(window.fbDb, "users", window.currentUser.uid);
+      const docSnap = await window.fbGetDoc(userNotesRef);
+      let notes = [];
+      if (docSnap.exists()) notes = docSnap.data().savedNotes || [];
+
+      // {질문, 답변, 과목, 시간} 패키지로 묶어서 밀어넣기
+      notes.push({ 
+        topic: userQuery, // 바인더 제목으로 쓰일 부분
+        userQuery: userQuery, 
+        aiAnswer: aiAnswer, 
+        subject: subject || '미분류', 
+        timestamp: Date.now() 
+      });
+      
+      await window.fbSetDoc(userNotesRef, { savedNotes: notes });
+      alert("☁️ 클라우드에 질문과 답변이 세트로 저장되었습니다!");
+      buildSubjList(); // 사이드바 새로고침
+    } catch (error) {
+      console.error("클라우드 저장 실패:", error);
+      alert("☁️ 저장 실패. 네트워크를 확인해 주세요.");
+    }
+  } else {
+    // 📱 로그아웃 상태: 폰 임시 저장소에 저장
+    let notes = JSON.parse(localStorage.getItem('savedNotes')) || [];
+    notes.push({ topic: userQuery, userQuery: userQuery, aiAnswer: aiAnswer, subject: subject || '미분류' });
+    localStorage.setItem('savedNotes', JSON.stringify(notes));
+    alert("📱 스마트폰 임시 저장소에 저장되었습니다. (클라우드 미동기화)");
+    buildSubjList();
+  }
+}
+
+// 2. 바인더에서 노트를 클릭했을 때 '질문+답변'을 같이 보여주는 함수
+function showSavedNote(n) {
+  const noteModal = document.getElementById('noteModal');
+  const contentArea = noteModal.querySelector('.note-body') || noteModal.querySelector('.summary-content');
+  
+  if(contentArea) {
+    // 구버전(summary)과 신버전(aiAnswer) 데이터 모두 호환되도록 처리
+    const answerText = n.aiAnswer || n.summary || "내용이 없습니다.";
+    const queryText = n.userQuery || n.topic || "질문 내용 없음";
+
+    // 질문 박스와 답변 영역을 예쁘게 분리해서 렌더링
+    contentArea.innerHTML = `
+      <div style="background:rgba(124,106,247,0.1); padding:15px; border-radius:10px; margin-bottom:15px; border-left:4px solid var(--accent);">
+        <strong style="color:var(--accent2);">Q. ${queryText}</strong>
+      </div>
+      <div class="saved-answer-area">
+        ${answerText}
+      </div>
+    `;
+    
+    // 저장된 수식 다시 예쁘게 렌더링 (MathJax)
+    if (window.MathJax) {
+      MathJax.typesetPromise([contentArea]).catch(err => console.error("MathJax Error:", err));
+    }
+  }
+  
+  noteModal.classList.add('open');
+}
 
 
   
+  
 </script>
+  
   <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
   import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";

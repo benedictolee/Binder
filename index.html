@@ -713,7 +713,23 @@ function buildSubjList(){
   const filterBtnStyle = showOnlyStarred ? "background:rgba(245,158,11,0.1); color:var(--amber); border:1px solid var(--amber);" : "background:var(--bg3); border:1px solid var(--border); color:var(--text);";
 
   // 사이드바 맨 위 버튼들 렌더링
-  l.innerHTML = `
+
+  // 👇 수정할 부분: 사이드바 맨 위 영역 (로그인 UI 추가)
+  let authHtml = '';
+  if (window.currentUser) {
+    authHtml = `<div style="display:flex; align-items:center; justify-content:space-between; padding:12px; background:rgba(124,106,247,0.1); border:1px solid var(--accent); border-radius:10px; margin-bottom:15px;">
+      <span style="font-size:13px; font-weight:bold; color:var(--accent2);">👤 ${window.currentUser.displayName}님</span>
+      <button onclick="logoutFirebase()" style="background:transparent; border:1px solid var(--accent); color:var(--accent2); padding:4px 8px; border-radius:6px; font-size:11px; cursor:pointer;">로그아웃</button>
+    </div>`;
+  } else {
+    authHtml = `<div style="display:flex; align-items:center; justify-content:space-between; padding:12px; background:var(--bg3); border:1px dashed var(--border2); border-radius:10px; margin-bottom:15px;">
+      <span style="font-size:12px; color:var(--text2);">☁️ 클라우드 동기화 꺼짐</span>
+      <button onclick="loginFirebase()" style="background:var(--accent); border:none; color:white; padding:6px 12px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">구글 로그인</button>
+    </div>`;
+  }
+
+  // 필터 버튼과 새 교재 추가 버튼 렌더링
+  l.innerHTML = authHtml + `
     <div style="display:flex; gap:8px; margin-bottom:8px;">
       <button class="add-book-btn" style="margin-bottom:0; flex:1;" onclick="openAddBookModal()">+ 📚 새 교재 추가</button>
       <button class="add-book-btn" style="margin-bottom:0; width:auto; padding:0 15px; font-size:18px;" onclick="openPromptModal()" title="프롬프트 설정">⚙️</button>
@@ -1449,6 +1465,45 @@ function sysPrompt(){
   return s + p;
 }
 
+// ══════════ FIREBASE 로그인/로그아웃 로직 ══════════
+window.currentUser = null;
+
+// 구글 로그인 팝업 띄우기
+async function loginFirebase() {
+  try {
+    const result = await window.fbSignIn(window.fbAuth, window.fbProvider);
+    console.log("로그인 성공!", result.user.email);
+    // (데이터 불러오는 로직은 3단계에서 추가할 예정!)
+  } catch (error) {
+    console.error("로그인 실패:", error);
+    alert("로그인 중 오류가 발생했습니다.");
+  }
+}
+
+// 로그아웃 하기
+async function logoutFirebase() {
+  if(confirm('로그아웃 하시겠습니까? (로그아웃 시 스마트폰 임시 저장소로 전환됩니다.)')) {
+    await window.fbSignOut(window.fbAuth);
+    window.currentUser = null;
+    buildSubjList(); // 사이드바 새로고침
+    alert('로그아웃 되었습니다.');
+  }
+}
+
+// 🚦 [핵심] 로그인 상태 감지기 (앱 켜질 때 자동으로 내 정보 확인)
+setTimeout(() => {
+  if(window.fbOnAuthStateChanged) {
+    window.fbOnAuthStateChanged(window.fbAuth, async (user) => {
+      if (user) {
+        window.currentUser = user; // 로그인됨
+        console.log("환영합니다!", user.displayName);
+      } else {
+        window.currentUser = null; // 로그아웃됨
+      }
+      buildSubjList(); // 상태에 맞게 사이드바 즉시 업데이트
+    });
+  }
+}, 500);
 
   
 </script>

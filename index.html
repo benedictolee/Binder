@@ -341,41 +341,6 @@ input[type=file]{display:none;}
 <body>
 
 
-  <script type="module">
-  // 1. 필요한 기능(인증, 데이터베이스) 가져오기
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
-  import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
-  import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
-
-  // 2. 재권님의 파이어베이스 비밀 열쇠
-  const firebaseConfig = {
-    apiKey: "AIzaSyAiLrmK02OZGFqhrtDIsBx5wbBGiAj2C-E",
-    authDomain: "abinder-82bdf.firebaseapp.com",
-    projectId: "abinder-82bdf",
-    storageBucket: "abinder-82bdf.firebasestorage.app",
-    messagingSenderId: "602931246412",
-    appId: "1:602931246412:web:8f1ee716d81b08874b0be9"
-  };
-
-  // 3. 파이어베이스 시동 걸기!
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db = getFirestore(app);
-
-  // 4. 기존 코드(바인더 로직)에서 파이어베이스를 쓸 수 있도록 연결 통로 열어두기
-  window.fbAuth = auth;
-  window.fbDb = db;
-  window.fbSignIn = signInWithPopup;
-  window.fbProvider = new GoogleAuthProvider();
-  window.fbOnAuthStateChanged = onAuthStateChanged;
-  window.fbSignOut = signOut;
-  window.fbDoc = doc;
-  window.fbGetDoc = getDoc;
-  window.fbSetDoc = setDoc;
-
-  console.log("🔥 파이어베이스 엔진 연결 성공!");
-</script>
-
 <div class="note-modal" id="promptModal">
   <div class="note-card">
     <div class="note-hdr">
@@ -1465,47 +1430,75 @@ function sysPrompt(){
   return s + p;
 }
 
-// ══════════ FIREBASE 로그인/로그아웃 로직 ══════════
-window.currentUser = null;
 
-// 구글 로그인 팝업 띄우기
-async function loginFirebase() {
-  try {
-    const result = await window.fbSignIn(window.fbAuth, window.fbProvider);
-    console.log("로그인 성공!", result.user.email);
-    // (데이터 불러오는 로직은 3단계에서 추가할 예정!)
-  } catch (error) {
-    console.error("로그인 실패:", error);
-    alert("로그인 중 오류가 발생했습니다.");
-  }
-}
-
-// 로그아웃 하기
-async function logoutFirebase() {
-  if(confirm('로그아웃 하시겠습니까? (로그아웃 시 스마트폰 임시 저장소로 전환됩니다.)')) {
-    await window.fbSignOut(window.fbAuth);
-    window.currentUser = null;
-    buildSubjList(); // 사이드바 새로고침
-    alert('로그아웃 되었습니다.');
-  }
-}
-
-// 🚦 [핵심] 로그인 상태 감지기 (앱 켜질 때 자동으로 내 정보 확인)
-setTimeout(() => {
-  if(window.fbOnAuthStateChanged) {
-    window.fbOnAuthStateChanged(window.fbAuth, async (user) => {
-      if (user) {
-        window.currentUser = user; // 로그인됨
-        console.log("환영합니다!", user.displayName);
-      } else {
-        window.currentUser = null; // 로그아웃됨
-      }
-      buildSubjList(); // 상태에 맞게 사이드바 즉시 업데이트
-    });
-  }
-}, 500);
 
   
 </script>
+  <script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+  import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
+  import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAiLrmK02OZGFqhrtDIsBx5wbBGiAj2C-E",
+    authDomain: "abinder-82bdf.firebaseapp.com",
+    projectId: "abinder-82bdf",
+    storageBucket: "abinder-82bdf.firebasestorage.app",
+    messagingSenderId: "602931246412",
+    appId: "1:602931246412:web:8f1ee716d81b08874b0be9"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  const provider = new GoogleAuthProvider();
+
+  // 로그인 상태 변수
+  window.currentUser = null;
+
+  // 1. 로그인 함수 (버튼 누르면 실행됨)
+  window.loginFirebase = async function() {
+    try {
+      const result = await signInWithPopup(auth, provider);
+      console.log("로그인 성공!", result.user.email);
+    } catch (error) {
+      console.error("로그인 에러:", error);
+      alert("로그인에 실패했습니다: " + error.message);
+    }
+  };
+
+  // 2. 로그아웃 함수
+  window.logoutFirebase = async function() {
+    if(confirm('로그아웃 하시겠습니까?')) {
+      await signOut(auth);
+      window.currentUser = null;
+      buildSubjList(); 
+      alert('로그아웃 되었습니다.');
+    }
+  };
+
+  // 3. 앱 켜질 때 로그인 상태 자동 확인
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      window.currentUser = user;
+      console.log("환영합니다!", user.displayName);
+    } else {
+      window.currentUser = null;
+    }
+    // 상태 바뀌면 사이드바 새로고침
+    if (typeof buildSubjList === "function") {
+      buildSubjList();
+    }
+  });
+
+  // 4. 나중에 데이터를 쏘기 위해 DB 연결고리 남겨두기
+  window.fbDb = db;
+  window.fbDoc = doc;
+  window.fbGetDoc = getDoc;
+  window.fbSetDoc = setDoc;
+
+  console.log("🔥 파이어베이스 엔진 & 로그인 모듈 장착 완료!");
+</script>
+
 </body>
 </html>

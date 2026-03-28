@@ -339,6 +339,43 @@ input[type=file]{display:none;}
 </style>
 </head>
 <body>
+
+
+  <script type="module">
+  // 1. 필요한 기능(인증, 데이터베이스) 가져오기
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+  import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
+  import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+  // 2. 재권님의 파이어베이스 비밀 열쇠
+  const firebaseConfig = {
+    apiKey: "AIzaSyAiLrmK02OZGFqhrtDIsBx5wbBGiAj2C-E",
+    authDomain: "abinder-82bdf.firebaseapp.com",
+    projectId: "abinder-82bdf",
+    storageBucket: "abinder-82bdf.firebasestorage.app",
+    messagingSenderId: "602931246412",
+    appId: "1:602931246412:web:8f1ee716d81b08874b0be9"
+  };
+
+  // 3. 파이어베이스 시동 걸기!
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  // 4. 기존 코드(바인더 로직)에서 파이어베이스를 쓸 수 있도록 연결 통로 열어두기
+  window.fbAuth = auth;
+  window.fbDb = db;
+  window.fbSignIn = signInWithPopup;
+  window.fbProvider = new GoogleAuthProvider();
+  window.fbOnAuthStateChanged = onAuthStateChanged;
+  window.fbSignOut = signOut;
+  window.fbDoc = doc;
+  window.fbGetDoc = getDoc;
+  window.fbSetDoc = setDoc;
+
+  console.log("🔥 파이어베이스 엔진 연결 성공!");
+</script>
+
 <div class="note-modal" id="promptModal">
   <div class="note-card">
     <div class="note-hdr">

@@ -669,96 +669,69 @@ function toggleStarFilter() {
   buildSubjList(); // 화면 다시 그리기
 }
 
-function buildSubjList(){
-  let starCounts = JSON.parse(localStorage.getItem('starCounts')) || {};
+
+// 1. 사이드바 렌더링 (별 개수를 클라우드에서 불러옴)
+async function buildSubjList() {
   const l = document.getElementById('subjList');
-  
-  // 필터 버튼 디자인 (켜졌을 때 주황색으로 강조)
+  if (!l) return;
+
+  // ☁️ 클라우드 vs 로컬 데이터 분기 (여기만 추가됨!)
+  let starCounts = {};
+  if (window.currentUser) {
+    try {
+      const docSnap = await window.fbGetDoc(window.fbDoc(window.fbDb, "users", window.currentUser.uid));
+      if (docSnap.exists()) starCounts = docSnap.data().starCounts || {};
+    } catch(e) { console.error("별점 불러오기 실패", e); }
+  } else {
+    starCounts = JSON.parse(localStorage.getItem('starCounts')) || {};
+  }
+
+  // 👇 아래부터는 재권님의 기존 코드 100% 동일합니다.
   const filterBtnText = showOnlyStarred ? "모든 단원 다시 보기" : "★ 저장된 단원만 모아보기";
   const filterBtnStyle = showOnlyStarred ? "background:rgba(245,158,11,0.1); color:var(--amber); border:1px solid var(--amber);" : "background:var(--bg3); border:1px solid var(--border); color:var(--text);";
 
-  // 사이드바 맨 위 버튼들 렌더링
+  let authHtml = window.currentUser 
+    ? `<div style="display:flex; align-items:center; justify-content:space-between; padding:12px; background:rgba(124,106,247,0.1); border:1px solid var(--accent); border-radius:10px; margin-bottom:15px;"><span style="font-size:13px; font-weight:bold; color:var(--accent2);">👤 ${window.currentUser.displayName}님</span><button onclick="logoutFirebase()" style="background:transparent; border:1px solid var(--accent); color:var(--accent2); padding:4px 8px; border-radius:6px; font-size:11px; cursor:pointer;">로그아웃</button></div>`
+    : `<div style="display:flex; align-items:center; justify-content:space-between; padding:12px; background:var(--bg3); border:1px dashed var(--border2); border-radius:10px; margin-bottom:15px;"><span style="font-size:12px; color:var(--text2);">☁️ 클라우드 동기화 꺼짐</span><button onclick="loginFirebase()" style="background:var(--accent); border:none; color:white; padding:6px 12px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">구글 로그인</button></div>`;
 
-  // 👇 수정할 부분: 사이드바 맨 위 영역 (로그인 UI 추가)
-  let authHtml = '';
-  if (window.currentUser) {
-    authHtml = `<div style="display:flex; align-items:center; justify-content:space-between; padding:12px; background:rgba(124,106,247,0.1); border:1px solid var(--accent); border-radius:10px; margin-bottom:15px;">
-      <span style="font-size:13px; font-weight:bold; color:var(--accent2);">👤 ${window.currentUser.displayName}님</span>
-      <button onclick="logoutFirebase()" style="background:transparent; border:1px solid var(--accent); color:var(--accent2); padding:4px 8px; border-radius:6px; font-size:11px; cursor:pointer;">로그아웃</button>
-    </div>`;
-  } else {
-    authHtml = `<div style="display:flex; align-items:center; justify-content:space-between; padding:12px; background:var(--bg3); border:1px dashed var(--border2); border-radius:10px; margin-bottom:15px;">
-      <span style="font-size:12px; color:var(--text2);">☁️ 클라우드 동기화 꺼짐</span>
-      <button onclick="loginFirebase()" style="background:var(--accent); border:none; color:white; padding:6px 12px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">구글 로그인</button>
-    </div>`;
-  }
-
-  // 필터 버튼과 새 교재 추가 버튼 렌더링
   l.innerHTML = authHtml + `
     <div style="display:flex; gap:8px; margin-bottom:8px;">
       <button class="add-book-btn" style="margin-bottom:0; flex:1;" onclick="openAddBookModal()">+ 📚 새 교재 추가</button>
       <button class="add-book-btn" style="margin-bottom:0; width:auto; padding:0 15px; font-size:18px;" onclick="openPromptModal()" title="프롬프트 설정">⚙️</button>
     </div>
-    <button class="add-book-btn" style="margin-bottom:15px; width:100%; transition:0.2s; font-size:13px; padding:10px; ${filterBtnStyle}" onclick="toggleStarFilter()">
-      ${filterBtnText}
-    </button>
-  `;
+    <button class="add-book-btn" style="margin-bottom:15px; width:100%; transition:0.2s; font-size:13px; padding:10px; ${filterBtnStyle}" onclick="toggleStarFilter()">${filterBtnText}</button>`;
 
   for (const [book, groups] of Object.entries(library)) {
-    // [필터 모드] 이 교재 전체에 별이 하나도 없으면 아예 안 그림 (스킵)
     let bookHasStar = false;
     if (showOnlyStarred) {
       for (const units of Object.values(groups)) {
-        for (const id of Object.keys(units)) {
-          if (starCounts[id] > 0) bookHasStar = true;
-        }
+        for (const id of Object.keys(units)) { if (starCounts[id] > 0) bookHasStar = true; }
       }
       if (!bookHasStar) continue; 
     }
 
-    // 필터 모드일 땐 폴더를 처음부터 다 열어둠! (hidden, collapsed 제거)
-    let bookHtml = `<div class="binder-category">
-      <div class="category-title ${showOnlyStarred ? '' : 'collapsed'}" onclick="this.nextElementSibling.classList.toggle('hidden'); this.classList.toggle('collapsed')">📁 ${book}</div>
-      <div class="${showOnlyStarred ? '' : 'hidden'}">`;
+    let bookHtml = `<div class="binder-category"><div class="category-title ${showOnlyStarred ? '' : 'collapsed'}" onclick="this.nextElementSibling.classList.toggle('hidden'); this.classList.toggle('collapsed')">📁 ${book}</div><div class="${showOnlyStarred ? '' : 'hidden'}">`;
 
     for (const [group, units] of Object.entries(groups)) {
-      
       let hasStar = false;
-      for (const id of Object.keys(units)) {
-        if (starCounts[id] > 0) {
-          hasStar = true; break; 
-        }
-      }
-      
-      // [필터 모드] 이 중단원에 별이 없으면 안 그림 (스킵)
+      for (const id of Object.keys(units)) { if (starCounts[id] > 0) { hasStar = true; break; } }
       if (showOnlyStarred && !hasStar) continue;
 
       const starBadge = hasStar ? `<span style="color:var(--amber); margin-left:6px; font-size:13px;">★</span>` : '';
-
-      bookHtml += `<div class="chapter-group">
-        <div class="group-title ${showOnlyStarred ? '' : 'collapsed'}" onclick="this.nextElementSibling.classList.toggle('hidden'); this.classList.toggle('collapsed')">
-          <span>${group}${starBadge}</span>
-        </div>
-        <div class="chapter-list ${showOnlyStarred ? '' : 'hidden'}">`;
+      bookHtml += `<div class="chapter-group"><div class="group-title ${showOnlyStarred ? '' : 'collapsed'}" onclick="this.nextElementSibling.classList.toggle('hidden'); this.classList.toggle('collapsed')"><span>${group}${starBadge}</span></div><div class="chapter-list ${showOnlyStarred ? '' : 'hidden'}">`;
       
       for (const [id, name] of Object.entries(units)) {
         const count = starCounts[id] || 0;
-        
-        // [필터 모드] 소단원에 별이 없으면 안 그림 (스킵)
         if (showOnlyStarred && count === 0) continue;
-
-        bookHtml += `
-          <div class="subj-item" onclick="openNote('${id}')" style="justify-content: space-between; padding: 8px 10px;">
-            <span style="flex:1;"><span class="subj-num" style="display:inline-block; width:45px;">${id}</span> ${name}</span>
-            <span class="star-count" style="color:var(--amber); font-weight:bold; font-size:12px;">★:${count}</span>
-          </div>`;
+        bookHtml += `<div class="subj-item" onclick="openNote('${id}')" style="justify-content: space-between; padding: 8px 10px;"><span style="flex:1;"><span class="subj-num" style="display:inline-block; width:45px;">${id}</span> ${name}</span><span class="star-count" style="color:var(--amber); font-weight:bold; font-size:12px;">★:${count}</span></div>`;
       }
-      bookHtml += `</div></div>`; // 2단 닫기
+      bookHtml += `</div></div>`;
     }
-    bookHtml += `</div></div>`; // 1단 닫기
+    bookHtml += `</div></div>`;
     l.innerHTML += bookHtml;
   }
 }
+
 
   
 
@@ -1236,58 +1209,71 @@ function clearChat(){
 
   // ══════════ BINDER NOTE VIEWER (4단계) ══════════
 
-// 사이드바에서 소단원을 클릭했을 때 노트를 엽니다.
-function openNote(targetId) {
+// 2. 노트 열기 (내용을 클라우드에서 불러옴)
+async function openNote(targetId) {
   const name = getSubjectName(targetId);
   document.getElementById('noteModalTitle').textContent = `[${targetId}] ${name}`;
-  
-  const savedNotes = JSON.parse(localStorage.getItem('savedNotes')) || {};
-  const notesArray = savedNotes[targetId] || [];
-  
   const body = document.getElementById('noteModalBody');
+  body.innerHTML = `<div style="text-align:center; padding: 40px 0; color:var(--text3);">데이터를 불러오는 중입니다... ⏳</div>`;
+  document.getElementById('noteModal').classList.add('open');
+
+  let notesArray = [];
+  if (window.currentUser) {
+    const docSnap = await window.fbGetDoc(window.fbDoc(window.fbDb, "users", window.currentUser.uid));
+    if (docSnap.exists() && docSnap.data().savedNotes) {
+      notesArray = docSnap.data().savedNotes[targetId] || [];
+    }
+  } else {
+    const savedNotes = JSON.parse(localStorage.getItem('savedNotes')) || {};
+    notesArray = savedNotes[targetId] || [];
+  }
   
   if (notesArray.length === 0) {
     body.innerHTML = `<div style="text-align:center; color:var(--text3); padding: 40px 0;">아직 저장된 노트가 없습니다.<br>채팅창에서 마음에 드는 답변에 ★을 눌러보세요!</div>`;
   } else {
     let html = '';
-    // 저장된 노트들을 하나씩 그립니다.
     notesArray.forEach((note, index) => {
-      // 렌더링 함수(render)를 거쳐서 예쁜 마크다운/수식으로 보여줍니다.
-      html += `
-        <div class="saved-item">
-          <button class="delete-note-btn" onclick="deleteNote('${targetId}', ${index})">지우기 ✕</button>
-          ${render(note)}
-        </div>`;
+      html += `<div class="saved-item"><button class="delete-note-btn" onclick="deleteNote('${targetId}', ${index})">지우기 ✕</button>${render(note)}</div>`;
     });
     body.innerHTML = html;
   }
-  
-  document.getElementById('noteModal').classList.add('open');
 }
+ 
 
 function closeNoteModal() {
   document.getElementById('noteModal').classList.remove('open');
 }
 
-// 특정 노트를 지우는(별 취소) 함수
-function deleteNote(targetId, index) {
+// 3. 노트 삭제 (클라우드 데이터 지우기)
+async function deleteNote(targetId, index) {
   if(!confirm('이 노트를 바인더에서 삭제하시겠습니까?')) return;
   
-  let savedNotes = JSON.parse(localStorage.getItem('savedNotes')) || {};
-  let starCounts = JSON.parse(localStorage.getItem('starCounts')) || {};
-  
-  if(savedNotes[targetId]) {
-    savedNotes[targetId].splice(index, 1); // 배열에서 해당 노트 삭제
-    localStorage.setItem('savedNotes', JSON.stringify(savedNotes));
-    
-    // 별 개수도 1개 차감 (0 이하로 안 떨어지게)
-    starCounts[targetId] = Math.max(0, (starCounts[targetId] || 0) - 1);
-    localStorage.setItem('starCounts', JSON.stringify(starCounts));
-    
-    buildSubjList(); // 사이드바 숫자 갱신
-    openNote(targetId); // 모달 화면 갱신
+  if (window.currentUser) {
+    const userNotesRef = window.fbDoc(window.fbDb, "users", window.currentUser.uid);
+    const docSnap = await window.fbGetDoc(userNotesRef);
+    if (docSnap.exists()) {
+      let data = docSnap.data();
+      if (data.savedNotes && data.savedNotes[targetId]) {
+        data.savedNotes[targetId].splice(index, 1);
+        data.starCounts[targetId] = Math.max(0, (data.starCounts[targetId] || 0) - 1);
+        await window.fbSetDoc(userNotesRef, data);
+      }
+    }
+  } else {
+    let savedNotes = JSON.parse(localStorage.getItem('savedNotes')) || {};
+    let starCounts = JSON.parse(localStorage.getItem('starCounts')) || {};
+    if(savedNotes[targetId]) {
+      savedNotes[targetId].splice(index, 1);
+      localStorage.setItem('savedNotes', JSON.stringify(savedNotes));
+      starCounts[targetId] = Math.max(0, (starCounts[targetId] || 0) - 1);
+      localStorage.setItem('starCounts', JSON.stringify(starCounts));
+    }
   }
+  
+  buildSubjList(); 
+  openNote(targetId); 
 }
+
 // ══════════ ADD BOOK MODAL (5-1단계 UI) ══════════
 let newBookImgBase64 = "";
 

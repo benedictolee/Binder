@@ -656,49 +656,79 @@ function startChat(){
  function showScreen(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); document.getElementById(id).classList.add('active'); }
 
 
+  
+// ══════════ SUBJECT & BINDER LIST ══════════
+// 별표 필터링 상태를 기억하는 변수
+let showOnlyStarred = false;
 
-  // ══════════ SUBJECT & BINDER LIST ══════════
+// 필터 버튼 누를 때 실행되는 함수
+function toggleStarFilter() {
+  showOnlyStarred = !showOnlyStarred;
+  buildSubjList(); // 화면 다시 그리기
+}
+
 function buildSubjList(){
   let starCounts = JSON.parse(localStorage.getItem('starCounts')) || {};
   const l = document.getElementById('subjList');
   
-  // 사이드바 맨 위 버튼들 (새 교재 추가 & 프롬프트 설정)
+  // 필터 버튼 디자인 (켜졌을 때 주황색으로 강조)
+  const filterBtnText = showOnlyStarred ? "모든 단원 다시 보기" : "★ 저장된 단원만 모아보기";
+  const filterBtnStyle = showOnlyStarred ? "background:rgba(245,158,11,0.1); color:var(--amber); border:1px solid var(--amber);" : "background:var(--bg3); border:1px solid var(--border); color:var(--text);";
+
+  // 사이드바 맨 위 버튼들 렌더링
   l.innerHTML = `
-    <div style="display:flex; gap:8px; margin-bottom:15px;">
+    <div style="display:flex; gap:8px; margin-bottom:8px;">
       <button class="add-book-btn" style="margin-bottom:0; flex:1;" onclick="openAddBookModal()">+ 📚 새 교재 추가</button>
       <button class="add-book-btn" style="margin-bottom:0; width:auto; padding:0 15px; font-size:18px;" onclick="openPromptModal()" title="프롬프트 설정">⚙️</button>
     </div>
+    <button class="add-book-btn" style="margin-bottom:15px; width:100%; transition:0.2s; font-size:13px; padding:10px; ${filterBtnStyle}" onclick="toggleStarFilter()">
+      ${filterBtnText}
+    </button>
   `;
 
   for (const [book, groups] of Object.entries(library)) {
-    // 1단: 과목명
+    // [필터 모드] 이 교재 전체에 별이 하나도 없으면 아예 안 그림 (스킵)
+    let bookHasStar = false;
+    if (showOnlyStarred) {
+      for (const units of Object.values(groups)) {
+        for (const id of Object.keys(units)) {
+          if (starCounts[id] > 0) bookHasStar = true;
+        }
+      }
+      if (!bookHasStar) continue; 
+    }
+
+    // 필터 모드일 땐 폴더를 처음부터 다 열어둠! (hidden, collapsed 제거)
     let bookHtml = `<div class="binder-category">
-      <div class="category-title collapsed" onclick="this.nextElementSibling.classList.toggle('hidden'); this.classList.toggle('collapsed')">📁 ${book}</div>
-      <div class="hidden">`;
+      <div class="category-title ${showOnlyStarred ? '' : 'collapsed'}" onclick="this.nextElementSibling.classList.toggle('hidden'); this.classList.toggle('collapsed')">📁 ${book}</div>
+      <div class="${showOnlyStarred ? '' : 'hidden'}">`;
 
     for (const [group, units] of Object.entries(groups)) {
       
-      // ⭐ [핵심 추가 로직] 이 중단원 안의 소단원 중에 별이 하나라도 있는지 검사!
       let hasStar = false;
       for (const id of Object.keys(units)) {
         if (starCounts[id] > 0) {
-          hasStar = true;
-          break; // 하나라도 찾으면 더 검사할 필요 없이 탈출
+          hasStar = true; break; 
         }
       }
-      // 별이 있으면 예쁜 주황색 별 아이콘을 달아줍니다.
+      
+      // [필터 모드] 이 중단원에 별이 없으면 안 그림 (스킵)
+      if (showOnlyStarred && !hasStar) continue;
+
       const starBadge = hasStar ? `<span style="color:var(--amber); margin-left:6px; font-size:13px;">★</span>` : '';
 
-      // 2단: 대단원(중단원) 렌더링 시 별 아이콘 같이 출력
       bookHtml += `<div class="chapter-group">
-        <div class="group-title collapsed" onclick="this.nextElementSibling.classList.toggle('hidden'); this.classList.toggle('collapsed')">
+        <div class="group-title ${showOnlyStarred ? '' : 'collapsed'}" onclick="this.nextElementSibling.classList.toggle('hidden'); this.classList.toggle('collapsed')">
           <span>${group}${starBadge}</span>
         </div>
-        <div class="chapter-list hidden">`;
+        <div class="chapter-list ${showOnlyStarred ? '' : 'hidden'}">`;
       
       for (const [id, name] of Object.entries(units)) {
-        // 3단: 소단원 아이템 및 ★ 개수 표시
         const count = starCounts[id] || 0;
+        
+        // [필터 모드] 소단원에 별이 없으면 안 그림 (스킵)
+        if (showOnlyStarred && count === 0) continue;
+
         bookHtml += `
           <div class="subj-item" onclick="openNote('${id}')" style="justify-content: space-between; padding: 8px 10px;">
             <span style="flex:1;"><span class="subj-num" style="display:inline-block; width:45px;">${id}</span> ${name}</span>
@@ -711,7 +741,8 @@ function buildSubjList(){
     l.innerHTML += bookHtml;
   }
 }
- 
+
+  
 
 // 프롬프트에 넣기 위해 교재명(단원 번호)을 찾는 유틸리티 (수정됨)
 function getSubjectName(targetId) {
